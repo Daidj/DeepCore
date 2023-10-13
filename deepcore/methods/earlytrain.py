@@ -142,6 +142,9 @@ class EarlyTrain(CoresetMethod):
                     epoch + 1) % self.args.selection_test_interval == 0:
                 self.test(epoch)
             self.after_epoch()
+            if self.need_stop():
+                print("Need Stop: ", epoch)
+                break
 
         return self.finish_run()
 
@@ -207,3 +210,6 @@ class EarlyTrain(CoresetMethod):
     def select(self, **kwargs):
         selection_result = self.run()
         return selection_result
+
+    def need_stop(self):
+        return False

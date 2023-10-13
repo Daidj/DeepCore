@@ -14,4 +14,6 @@ from .kcentergreedy import *
 from .submodular import *
 from .uncertainty import *
 from .uniform import *
+from .random import *
+from .NotDiff import *
 

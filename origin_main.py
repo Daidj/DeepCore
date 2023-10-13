@@ -1,19 +1,16 @@
 import os
 import torch.nn as nn
 import argparse
-
-import visdom
-
 import deepcore.nets as nets
 import deepcore.datasets as datasets
 import deepcore.methods as methods
 from torchvision import transforms
 from utils import *
 from datetime import datetime
+from time import sleep
 
-def main(wb=None):
 
-
+def main():
     parser = argparse.ArgumentParser(description='Parameter Processing')
 
     # Basic arguments
@@ -24,7 +21,7 @@ def main(wb=None):
     parser.add_argument('--num_eval', type=int, default=10, help='the number of evaluating randomly initialized models')
     parser.add_argument('--epochs', default=200, type=int, help='number of total epochs to run')
     parser.add_argument('--data_path', type=str, default='data', help='dataset path')
-    parser.add_argument('--gpu', default=0, nargs="+", type=int, help='GPU id to use')
+    parser.add_argument('--gpu', default=None, nargs="+", type=int, help='GPU id to use')
     parser.add_argument('--print_freq', '-p', default=20, type=int, help='print frequency (default: 20)')
     parser.add_argument('--fraction', default=0.1, type=float, help='fraction of data to be selected (default: 0.1)')
     parser.add_argument('--seed', default=int(time.time() * 1000) % 100000, type=int, help="random seed")
@@ -35,13 +32,15 @@ def main(wb=None):
     # Optimizer and scheduler
     parser.add_argument('--optimizer', default="SGD", help='optimizer to use, e.g. SGD, Adam')
     parser.add_argument('--lr', type=float, default=0.1, help='learning rate for updating network parameters')
-    parser.add_argument('--min_lr', type=float, default=0.0, help='minimum learning rate')
-    parser.add_argument('--momentum', default=0.9, type=float, metavar='M', help='momentum (default: 0.9)')
+    parser.add_argument('--min_lr', type=float, default=1e-4, help='minimum learning rate')
+    parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
+                        help='momentum (default: 0.9)')
     parser.add_argument('-wd', '--weight_decay', default=5e-4, type=float,
                         metavar='W', help='weight decay (default: 5e-4)',
                         dest='weight_decay')
     parser.add_argument("--nesterov", default=True, type=str_to_bool, help="if set nesterov")
-    parser.add_argument("--scheduler", default="CosineAnnealingLR", type=str, help="Learning rate scheduler")
+    parser.add_argument("--scheduler", default="CosineAnnealingLR", type=str, help=
+    "Learning rate scheduler")
     parser.add_argument("--gamma", type=float, default=.5, help="Gamma value for StepLR")
     parser.add_argument("--step_size", type=float, default=50, help="Step size for StepLR")
 
@@ -90,9 +89,6 @@ def main(wb=None):
     parser.add_argument('--resume', '-r', type=str, default='', help="path to latest checkpoint (default: do not load)")
 
     args = parser.parse_args()
-
-    vis = visdom.Visdom(env='LeNet{}'.format(args.fraction))
-
     args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     if args.train_batch is None:
@@ -164,7 +160,7 @@ def main(wb=None):
                                   )
             method = methods.__dict__[args.selection](dst_train, args, args.fraction, args.seed, **selection_args)
             subset = method.select()
-        print("selected length: ", len(subset["indices"]))
+        print(len(subset["indices"]))
 
         # Augmentation
         if args.dataset == "CIFAR10" or args.dataset == "CIFAR100":
@@ -214,7 +210,6 @@ def main(wb=None):
             if args.device == "cpu":
                 print("Using CPU.")
             elif args.gpu is not None:
-                print("Using GPU {}".format(args.gpu[0]))
                 torch.cuda.set_device(args.gpu[0])
                 network = nets.nets_utils.MyDataParallel(network, device_ids=args.gpu)
             elif torch.cuda.device_count() > 1:
@@ -257,7 +252,6 @@ def main(wb=None):
                 rec = init_recorder()
 
             best_prec1 = checkpoint["best_acc1"] if "best_acc1" in checkpoint.keys() else 0.0
-            best_epoch = -1
 
             # Save the checkpont with only the susbet.
             if args.save_path != "" and args.resume == "":
@@ -270,10 +264,7 @@ def main(wb=None):
 
             for epoch in range(start_epoch, args.epochs):
                 # train for one epoch
-                start_time = time.time()
                 train(train_loader, network, criterion, optimizer, scheduler, epoch, args, rec, if_weighted=if_weighted)
-                end_time = time.time()
-                print("Train time: {}".format(end_time-start_time))
 
                 # evaluate on validation set
                 if args.test_interval > 0 and (epoch + 1) % args.test_interval == 0:
@@ -284,7 +275,6 @@ def main(wb=None):
 
                     if is_best:
                         best_prec1 = prec1
-                        best_epoch = epoch
                         if args.save_path != "":
                             rec = record_ckpt(rec, epoch)
                             save_checkpoint({"exp": exp,
@@ -321,29 +311,11 @@ def main(wb=None):
                                     epoch=args.epochs - 1,
                                     prec=best_prec1)
 
-            print('| Best accuracy: ', best_prec1, "\nBest epoch: ", best_epoch, " on model " + model if len(models) > 1 else "", end="\n\n")
+            print('| Best accuracy: ', best_prec1, ", on model " + model if len(models) > 1 else "", end="\n\n")
             start_epoch = 0
             checkpoint = {}
-            # visdom
-            epoch_list =[i for i in range(start_epoch, args.epochs)]
-            vis.line(Y=rec.train_loss, X=epoch_list, win='train_loss_{}'.format(exp), opts = dict(title='train_loss_{}'.format(exp), showlegend=True))
-            vis.line(Y=rec.train_acc, X=epoch_list, win='train_acc_{}'.format(exp), opts=dict(title='train_acc_{}'.format(exp), showlegend=True))
-            vis.line(Y=rec.lr, X=epoch_list, win='train_lr_{}'.format(exp),
-                     opts=dict(title='train_lr_{}'.format(exp), showlegend=True))
-            vis.line(Y=rec.test_loss, X=epoch_list, win='test_loss_{}'.format(exp),
-                     opts=dict(title='test_loss_{}'.format(exp), showlegend=True))
-            vis.line(Y=rec.test_acc, X=epoch_list, win='test_acc_{}'.format(exp),
-                     opts=dict(title='test_acc_{}'.format(exp), showlegend=True))
-            vis.text("Exp {} result: Best accuracy: {}, Best epoch: {} \n".format(exp, best_prec1, best_epoch), win='result', append=True if exp != 0 else False)
-            if wb != None:
-                wb.append(args.fraction, exp, best_prec1)
-            # vis.replay_log('./visdom/img_{}.log'.format(args.fraction))
-            # rec.train_acc.append(acc)
-            # rec.lr.append(lr)
+            sleep(2)
 
 
 if __name__ == '__main__':
-    global_start_time = time.time()
     main()
-    global_end_time = time.time()
-    print("Time: ", global_end_time-global_start_time)
