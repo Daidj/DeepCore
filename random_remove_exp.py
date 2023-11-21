@@ -24,12 +24,42 @@ running_args = {
     "--test_interval": 1
 }
 
+test_args = {
+    "--dataset": "MNIST",
+    "--model": "LeNet",
+    "--selection": "Random",
+    "--num_exp": 1,
+    "--num_eval": 1,
+    "--epochs": 10,
+    "--data_path": "data",
+    "--gpu": 0,
+    "--print_freq": 20,
+    "--fraction": 0.1,
+    "--workers": 8,
+    "--optimizer": "Adam",
+    "--lr": 0.002,
+    "--momentum": 0.0,
+    "--weight_decay": 0.0,
+    "--nesterov": False,
+    "--train_batch": 256,
+    "--test_interval": 1
+}
+
+
+def test_model():
+    for k, v in test_args.items():
+        sys.argv.append(k)
+        sys.argv.append(str(v))
+    print(sys.argv)
+    main()
+
+
 if __name__ == '__main__':
-    start_fraction = 0.1375
+    test_model()
+    start_fraction = 1.0
     number = 1
     fraction_list = [start_fraction - i * 0.02 for i in range(number)]
-    # result_dict = {'实验序号/选择比例': [i+1 for i in range(running_args["--num_eval"])]}
-    wb = WorkBook(running_args["--num_exp"], fraction_list)
+    wb = WorkBook(running_args["--num_exp"])
 
     origin_argv = sys.argv
     print(sys.argv)
@@ -43,5 +73,5 @@ if __name__ == '__main__':
 
         sys.argv = []
         sys.argv.append(origin_argv[0])
-    wb.to_excel('./excel/data_{}.xlsx'.format(start_fraction))
+        wb.to_excel('./excel/data_random_{}.xlsx'.format(fraction))
     print("random end")

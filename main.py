@@ -91,7 +91,7 @@ def main(wb=None):
 
     args = parser.parse_args()
 
-    vis = visdom.Visdom(env='LeNet{}'.format(args.fraction))
+    vis = visdom.Visdom(env='{}_{}'.format(args.selection, args.fraction))
 
     args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -132,6 +132,7 @@ def main(wb=None):
         start_epoch = 0
 
     for exp in range(start_exp, args.num_exp):
+        exp_start_time = time.time()
         if args.save_path != "":
             checkpoint_name = "{dst}_{net}_{mtd}_exp{exp}_epoch{epc}_{dat}_{fr}_".format(dst=args.dataset,
                                                                                          net=args.model,
@@ -152,6 +153,7 @@ def main(wb=None):
 
         torch.random.manual_seed(args.seed)
 
+        algorithm_start_time = time.time()
         if "subset" in checkpoint.keys():
             subset = checkpoint['subset']
             selection_args = checkpoint["sel_args"]
@@ -164,7 +166,9 @@ def main(wb=None):
                                   )
             method = methods.__dict__[args.selection](dst_train, args, args.fraction, args.seed, **selection_args)
             subset = method.select()
-        print("selected length: ", len(subset["indices"]))
+        algorithm_end_time = time.time()
+        selected_length = len(subset["indices"])
+        print("selected length: ", selected_length)
 
         # Augmentation
         if args.dataset == "CIFAR10" or args.dataset == "CIFAR100":
@@ -321,7 +325,9 @@ def main(wb=None):
                                     epoch=args.epochs - 1,
                                     prec=best_prec1)
 
+            exp_end_time = time.time()
             print('| Best accuracy: ', best_prec1, "\nBest epoch: ", best_epoch, " on model " + model if len(models) > 1 else "", end="\n\n")
+
             start_epoch = 0
             checkpoint = {}
             # visdom
@@ -336,7 +342,10 @@ def main(wb=None):
                      opts=dict(title='test_acc_{}'.format(exp), showlegend=True))
             vis.text("Exp {} result: Best accuracy: {}, Best epoch: {} \n".format(exp, best_prec1, best_epoch), win='result', append=True if exp != 0 else False)
             if wb != None:
-                wb.append(args.fraction, exp, best_prec1)
+                wb.append('样本数量', exp, selected_length)
+                wb.append('总时间', exp, exp_end_time - exp_start_time)
+                wb.append('准确度', exp, best_prec1)
+                wb.append('算法时间', exp, algorithm_end_time - algorithm_start_time)
             # vis.replay_log('./visdom/img_{}.log'.format(args.fraction))
             # rec.train_acc.append(acc)
             # rec.lr.append(lr)

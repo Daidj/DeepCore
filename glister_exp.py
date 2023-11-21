@@ -7,14 +7,16 @@ from random_remove_exp import test_model
 running_args = {
     "--dataset": "MNIST",
     "--model": "LeNet",
-    "--selection": "NotDiff",
+    "--selection": "Glister",
     "--num_exp": 20,
+    # "--num_exp": 2,
     "--num_eval": 1,
+    # "--epochs": 20,
     "--epochs": 200,
     "--data_path": "data",
     "--gpu": 0,
     "--print_freq": 20,
-    "--fraction": 1.0,
+    "--fraction": 0.38,
     "--workers": 8,
     "--optimizer": "Adam",
     "--lr": 0.002,
@@ -44,5 +46,5 @@ if __name__ == '__main__':
     print(sys.argv)
     main(wb)
 
-    wb.to_excel('./excel/data_not_diff.xlsx')
+    wb.to_excel('./excel/data_glister.xlsx')
     print("end")

@@ -15,8 +15,11 @@ class NotDiff(EarlyTrain):
         self.candidate_set = set()
         self.train_error_set = set()
         self.valid_error_set = set()
+        self.dataset_length = len(dst_train)
+        self.valid_model_train_number = 0
         self.not_diff = 0
         self.balance = balance
+        self.confidence = 0.95
 
     def get_hms(self, seconds):
         # Format time for printing purposes
@@ -32,7 +35,7 @@ class NotDiff(EarlyTrain):
         self.valid_model.train()
 
         print('\n=> Training Epoch(Valid Model) #%d' % epoch)
-        print(list_of_train_idx)
+        # print(list_of_train_idx)
         trainset_permutation_inds = np.random.permutation(list_of_train_idx)
         batch_sampler = torch.utils.data.BatchSampler(trainset_permutation_inds, batch_size=self.args.selection_batch,
                                                       drop_last=False)
@@ -50,7 +53,7 @@ class NotDiff(EarlyTrain):
             outputs = self.valid_model(inputs)
             loss = self.criterion(outputs, targets)
             # batch_inds = trainset_permutation_inds[i]
-            self.after_loss(outputs, loss, targets, trainset_permutation_inds[i], epoch)
+            self.valid_model_after_loss(outputs, loss, targets, trainset_permutation_inds[i], epoch)
 
             # Update loss, backward propagate, update optimizer
             loss = loss.mean()
@@ -64,13 +67,20 @@ class NotDiff(EarlyTrain):
     def run_valid_model(self):
         if len(self.candidate_set) == 0:
             return
+        print("candidate set len: ", len(self.candidate_set))
 
         list_of_train_idx = np.array(list(self.candidate_set))
-        print(list_of_train_idx)
-        self.train_valid_model(0, list_of_train_idx)
-            # if self.dst_test is not None and self.args.selection_test_interval > 0 and (
-            #         epoch + 1) % self.args.selection_test_interval == 0:
-            #     self.test(epoch)
+        train_number = len(list_of_train_idx)
+        while True:
+            print("valid_model_train_number", self.valid_model_train_number)
+            self.train_valid_model(0, list_of_train_idx)
+            self.valid_model_train_number = self.valid_model_train_number + train_number
+            if self.valid_model_train_number > self.dataset_length:
+                self.valid_model_train_number = self.valid_model_train_number % self.dataset_length
+                break
+        # if self.dst_test is not None and self.args.selection_test_interval > 0 and (
+        #         epoch + 1) % self.args.selection_test_interval == 0:
+        #     self.test(epoch)
 
     def before_train(self):
         self.train_loss = 0.
@@ -81,14 +91,62 @@ class NotDiff(EarlyTrain):
         # if epoch == 0:
         #     return
         with torch.no_grad():
-            _, predicted = torch.max(outputs.data, 1)
+            softmax_value = torch.exp(outputs) / torch.sum(torch.exp(outputs), dim=1, keepdim=True)
+
+            max_acc, predicted = torch.max(softmax_value, 1)
+
+            # max_value, predicted = torch.max(outputs.data, 1)
+            # sum_value = torch.sum(outputs.data, 1)
 
             cur_acc = (predicted == targets).clone().detach().requires_grad_(False).type(torch.float32)
+            cur_certain = (max_acc > self.confidence).clone().detach().requires_grad_(False).type(torch.float32)
+            # 添加进候选集
+            error_index = torch.tensor(batch_inds)[(cur_acc==0).nonzero()].reshape(-1)
+            self.candidate_set = self.candidate_set.union(set(error_index.numpy().tolist()))
+            self.train_error_set = self.train_error_set.union(set(error_index.numpy().tolist()))
+            not_certain_index = torch.tensor(batch_inds)[(cur_certain == 0).nonzero()].reshape(-1)
+            self.candidate_set = self.candidate_set.union(set(not_certain_index.numpy().tolist()))
+            self.train_error_set = self.train_error_set.union(set(not_certain_index.numpy().tolist()))
+            # print(error_index.shape)
+            # print(error_index)
+            # print(not_certain_index.shape)
+            # print(not_certain_index)
+            # print(set(error_index.numpy().tolist()).intersection(set(not_certain_index.numpy().tolist())))
+            # print(self.candidate_set)
+            # print("candidate set len: ", len(self.candidate_set))
+            # print("end")
+            # self.forgetting_events[torch.tensor(batch_inds)[(self.last_acc[batch_inds] - cur_acc) > 0.01]] += 1.
+            # self.last_acc[batch_inds] = cur_acc
+
+    def valid_model_after_loss(self, outputs, loss, targets, batch_inds, epoch):
+        # if epoch == 0:
+        #     return
+        with torch.no_grad():
+
+            softmax_value = torch.exp(outputs) / torch.sum(torch.exp(outputs), dim=1, keepdim=True)
+
+            max_acc, predicted = torch.max(softmax_value, 1)
+
+            # max_value, predicted = torch.max(outputs.data, 1)
+            # sum_value = torch.sum(outputs.data, 1)
+
+            cur_acc = (predicted == targets).clone().detach().requires_grad_(False).type(torch.float32)
+            cur_certain = (max_acc > self.confidence).clone().detach().requires_grad_(False).type(torch.float32)
             # 添加进候选集
             error_index = torch.tensor(batch_inds)[(cur_acc==0).nonzero()].reshape(-1)
             self.candidate_set = self.candidate_set.union(set(error_index.numpy().tolist()))
             self.valid_error_set = self.valid_error_set.union(set(error_index.numpy().tolist()))
-            print("candidate set len: ", len(self.candidate_set))
+            not_certain_index = torch.tensor(batch_inds)[(cur_certain == 0).nonzero()].reshape(-1)
+            self.candidate_set = self.candidate_set.union(set(not_certain_index.numpy().tolist()))
+            self.valid_error_set = self.valid_error_set.union(set(not_certain_index.numpy().tolist()))
+            # print(error_index.shape)
+            # print(error_index)
+            # print(not_certain_index.shape)
+            # print(not_certain_index)
+            # print(set(error_index.numpy().tolist()).intersection(set(not_certain_index.numpy().tolist())))
+            # print(self.candidate_set)
+            # print("candidate set len: ", len(self.candidate_set))
+            # print("end")
             # self.forgetting_events[torch.tensor(batch_inds)[(self.last_acc[batch_inds] - cur_acc) > 0.01]] += 1.
             # self.last_acc[batch_inds] = cur_acc
 
@@ -105,14 +163,16 @@ class NotDiff(EarlyTrain):
 
     def before_epoch(self):
         self.start_time = time.time()
+        self.train_error_set = set()
+        self.valid_error_set = set()
 
     def after_epoch(self):
         epoch_time = time.time() - self.start_time
         self.elapsed_time += epoch_time
 
         print('| Elapsed time : %d:%02d:%02d' % (self.get_hms(self.elapsed_time)))
-        self.train_error_set = self.valid_error_set
-        self.valid_error_set = set()
+        # self.train_error_set = self.valid_error_set
+        # self.valid_error_set = set()
         self.run_valid_model()
         print("train len: ", len(self.train_error_set))
         print("valid len: ", len(self.valid_error_set))
@@ -122,7 +182,6 @@ class NotDiff(EarlyTrain):
         print("diff: ", len(diff))
         if len(diff) < 5:
             self.not_diff += 1
-
 
     def before_run(self):
         self.elapsed_time = 0
@@ -153,18 +212,18 @@ class NotDiff(EarlyTrain):
         # Setup optimizer
         if self.args.selection_optimizer == "SGD":
             self.valid_model_optimizer = torch.optim.SGD(self.model.parameters(), lr=self.args.selection_lr,
-                                                   momentum=self.args.selection_momentum,
-                                                   weight_decay=self.args.selection_weight_decay,
-                                                   nesterov=self.args.selection_nesterov)
+                                                         momentum=self.args.selection_momentum,
+                                                         weight_decay=self.args.selection_weight_decay,
+                                                         nesterov=self.args.selection_nesterov)
         elif self.args.selection_optimizer == "Adam":
             self.valid_model_optimizer = torch.optim.Adam(self.model.parameters(), lr=self.args.selection_lr,
-                                                    weight_decay=self.args.selection_weight_decay)
+                                                          weight_decay=self.args.selection_weight_decay)
         else:
             self.valid_model_optimizer = torch.optim.__dict__[self.args.selection_optimizer](self.model.parameters(),
-                                                                                       lr=self.args.selection_lr,
-                                                                                       momentum=self.args.selection_momentum,
-                                                                                       weight_decay=self.args.selection_weight_decay,
-                                                                                       nesterov=self.args.selection_nesterov)
+                                                                                             lr=self.args.selection_lr,
+                                                                                             momentum=self.args.selection_momentum,
+                                                                                             weight_decay=self.args.selection_weight_decay,
+                                                                                             nesterov=self.args.selection_nesterov)
 
     def finish_run(self):
         if self.not_diff > 4:

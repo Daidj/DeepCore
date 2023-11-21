@@ -3,17 +3,23 @@ import sys
 import pandas as pds
 
 class WorkBook(object):
-    def __init__(self, num_exp, fraction_list):
+    def __init__(self, num_exp):
         first_column = [i+1 for i in range(num_exp)]
-        first_column.append("Average")
+        # first_column.append("Average")
         row_num = len(first_column)
-        first_row = [first_column[0]]
-        for i in fraction_list:
-            first_row.append(i)
-        column_num = len(first_row)
-        self.write_data = {'实验序号/选择比例': first_column}
-        for i in range(1, column_num):
-            self.write_data[first_row[i]] = ['' for j in range(row_num)]
+        # first_row = [first_column[0]]
+        # for i in fraction_list:
+        #     first_row.append(i)
+        # column_num = len(first_row)
+        self.write_data = {
+            '实验序号': first_column,
+            '样本数量': ['' for i in range(row_num)],
+            '准确度': ['' for i in range(row_num)],
+            '总时间': ['' for i in range(row_num)],
+            '算法时间': ['' for i in range(row_num)]
+        }
+        # for i in range(1, column_num):
+        #     self.write_data[first_row[i]] = ['' for j in range(row_num)]
     def to_excel(self, path='./data.xlsx'):
         # os.remove(path)
         df = pds.DataFrame(self.write_data)
@@ -23,6 +29,6 @@ class WorkBook(object):
 if __name__ == '__main__':
 
     wb = WorkBook(20, [1.0, 2.0])
-    wb.append(1.0, 0, 0.99)
-    wb.to_excel()
+    wb.append('样本数量', 0, 60000)
+    wb.to_excel('./excel/test.xlsx')
     print("run end")
