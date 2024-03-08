@@ -16,4 +16,6 @@ from .uncertainty import *
 from .uniform import *
 from .random import *
 from .NotDiff import *
+from .uncertainty_new import *
+from .mmd import *
 

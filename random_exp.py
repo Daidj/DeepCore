@@ -4,10 +4,40 @@ from WorkBook import WorkBook
 from main import main
 from random_remove_exp import test_model
 
+# running_args = {
+#     "--dataset": "MNIST",
+#     "--model": "LeNet",
+#     "--selection": "Random",
+#     "--num_exp": 20,
+#     # "--num_exp": 2,
+#     "--num_eval": 1,
+#     # "--epochs": 20,
+#     "--epochs": 200,
+#     "--data_path": "data",
+#     "--gpu": 0,
+#     "--print_freq": 20,
+#     "--fraction": 0.35,
+#     "--workers": 8,
+#     "--optimizer": "Adam",
+#     "--lr": 0.002,
+#     "--momentum": 0.0,
+#     "--weight_decay": 0.0,
+#     "--nesterov": False,
+#     "--train_batch": 256,
+#     "--test_interval": 1,
+#     "--selection_epochs": 25,
+#     "--selection_momentum": 0.0,
+#     "--selection_weight_decay": 0.0,
+#     "--selection_optimizer": "Adam",
+#     "--selection_lr": 0.002,
+#     "--selection_test_interval": 1,
+#     "--balance": True
+# }
+
 running_args = {
-    "--dataset": "MNIST",
-    "--model": "LeNet",
-    "--selection": "Glister",
+    "--dataset": "CIFAR10",
+    "--model": "ResNet18",
+    "--selection": "Random",
     "--num_exp": 20,
     # "--num_exp": 2,
     "--num_eval": 1,
@@ -16,8 +46,8 @@ running_args = {
     "--data_path": "data",
     "--gpu": 0,
     "--print_freq": 20,
-    "--fraction": 0.2,
-    "--workers": 8,
+    "--fraction": 1.0,
+    "--workers": 4,
     "--optimizer": "Adam",
     "--lr": 0.002,
     "--momentum": 0.0,
@@ -47,5 +77,6 @@ if __name__ == '__main__':
     print(sys.argv)
     main(wb)
 
-    wb.to_excel('./excel/data_glister.xlsx')
+    wb.append('备注', 0, "全部数据,CIFAR10, ResNet18")
+    wb.to_excel('./excel/data_full.xlsx')
     print("end")

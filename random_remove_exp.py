@@ -30,7 +30,7 @@ test_args = {
     "--selection": "Random",
     "--num_exp": 1,
     "--num_eval": 1,
-    "--epochs": 10,
+    "--epochs": 5,
     "--data_path": "data",
     "--gpu": 0,
     "--print_freq": 20,

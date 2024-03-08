@@ -16,7 +16,10 @@ class WorkBook(object):
             '样本数量': ['' for i in range(row_num)],
             '准确度': ['' for i in range(row_num)],
             '总时间': ['' for i in range(row_num)],
-            '算法时间': ['' for i in range(row_num)]
+            '算法时间': ['' for i in range(row_num)],
+            'MMD时间': ['' for i in range(row_num)],
+            'MMD距离': ['' for i in range(row_num)],
+            '备注': ['' for i in range(row_num)]
         }
         # for i in range(1, column_num):
         #     self.write_data[first_row[i]] = ['' for j in range(row_num)]
@@ -28,7 +31,8 @@ class WorkBook(object):
         self.write_data[column_id][index] = data
 if __name__ == '__main__':
 
-    wb = WorkBook(20, [1.0, 2.0])
+    wb = WorkBook(20)
     wb.append('样本数量', 0, 60000)
+    wb.append('备注', 0, "测试")
     wb.to_excel('./excel/test.xlsx')
     print("run end")

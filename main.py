@@ -169,7 +169,13 @@ def main(wb=None):
         algorithm_end_time = time.time()
         selected_length = len(subset["indices"])
         print("selected length: ", selected_length)
+        MMD_start_time = time.time()
+        mmd_distance = 0
+        if "mmd_distance" in subset.keys():
+            mmd_distance = torch.tensor(subset["mmd_distance"]).sum().item()
 
+        print(mmd_distance)
+        MMD_end_time = time.time()
         # Augmentation
         if args.dataset == "CIFAR10" or args.dataset == "CIFAR100":
             dst_train.transform = transforms.Compose(
@@ -346,6 +352,8 @@ def main(wb=None):
                 wb.append('总时间', exp, exp_end_time - exp_start_time)
                 wb.append('准确度', exp, best_prec1)
                 wb.append('算法时间', exp, algorithm_end_time - algorithm_start_time)
+                wb.append('MMD时间', exp, MMD_end_time - MMD_start_time)
+                wb.append('MMD距离', exp, mmd_distance)
             # vis.replay_log('./visdom/img_{}.log'.format(args.fraction))
             # rec.train_acc.append(acc)
             # rec.lr.append(lr)

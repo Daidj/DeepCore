@@ -10,6 +10,7 @@ class Uncertainty(EarlyTrain):
 
         selection_choices = ["LeastConfidence",
                              "Entropy",
+                             "Confidence",
                              "Margin"]
         if selection_method not in selection_choices:
             raise NotImplementedError("Selection algorithm unavailable.")
@@ -74,6 +75,12 @@ class Uncertainty(EarlyTrain):
                 elif self.selection_method == "Entropy":
                     preds = torch.nn.functional.softmax(self.model(input.to(self.args.device)), dim=1).cpu().numpy()
                     scores = np.append(scores, (np.log(preds + 1e-6) * preds).sum(axis=1))
+                elif self.selection_method == "Confidence":
+                    preds = torch.nn.functional.softmax(self.model(input.to(self.args.device)), dim=1).cpu().numpy()
+                    max_preds = preds.max(axis=1)
+                    # print(max_preds)
+                    # print(max_preds.shape)
+                    scores = np.append(scores, 1-max_preds)
                 elif self.selection_method == 'Margin':
                     preds = torch.nn.functional.softmax(self.model(input.to(self.args.device)), dim=1)
                     preds_argmax = torch.argmax(preds, dim=1)

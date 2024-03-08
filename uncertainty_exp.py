@@ -7,7 +7,7 @@ from random_remove_exp import test_model
 running_args = {
     "--dataset": "MNIST",
     "--model": "LeNet",
-    "--selection": "Glister",
+    "--selection": "Uncertainty",
     "--num_exp": 20,
     # "--num_exp": 2,
     "--num_eval": 1,
@@ -16,7 +16,7 @@ running_args = {
     "--data_path": "data",
     "--gpu": 0,
     "--print_freq": 20,
-    "--fraction": 0.2,
+    "--fraction": 0.35,
     "--workers": 8,
     "--optimizer": "Adam",
     "--lr": 0.002,
@@ -26,11 +26,13 @@ running_args = {
     "--train_batch": 256,
     "--test_interval": 1,
     "--selection_epochs": 25,
+    # "--selection_epochs": 2,
     "--selection_momentum": 0.0,
     "--selection_weight_decay": 0.0,
     "--selection_optimizer": "Adam",
     "--selection_lr": 0.002,
     "--selection_test_interval": 1,
+    "--uncertainty": "Confidence",
     "--balance": True
 }
 
@@ -47,5 +49,5 @@ if __name__ == '__main__':
     print(sys.argv)
     main(wb)
 
-    wb.to_excel('./excel/data_glister.xlsx')
+    wb.to_excel('./excel/data_uncertainty_confidence_min.xlsx')
     print("end")
