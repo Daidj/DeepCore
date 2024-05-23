@@ -8,15 +8,15 @@ from random_remove_exp import test_model
 #     "--dataset": "MNIST",
 #     "--model": "LeNet",
 #     "--selection": "Random",
-#     "--num_exp": 20,
-#     # "--num_exp": 2,
+#     # "--num_exp": 20,
+#     "--num_exp": 1,
 #     "--num_eval": 1,
-#     # "--epochs": 20,
-#     "--epochs": 200,
+#     "--epochs": 2,
+#     # "--epochs": 200,
 #     "--data_path": "data",
 #     "--gpu": 0,
 #     "--print_freq": 20,
-#     "--fraction": 0.35,
+#     "--fraction": 1.0,
 #     "--workers": 8,
 #     "--optimizer": "Adam",
 #     "--lr": 0.002,
@@ -38,11 +38,11 @@ running_args = {
     "--dataset": "CIFAR10",
     "--model": "ResNet18",
     "--selection": "Random",
-    "--num_exp": 20,
-    # "--num_exp": 2,
+    # "--num_exp": 20,
+    "--num_exp": 1,
     "--num_eval": 1,
-    # "--epochs": 20,
-    "--epochs": 200,
+    "--epochs": 2,
+    # "--epochs": 200,
     "--data_path": "data",
     "--gpu": 0,
     "--print_freq": 20,
@@ -65,7 +65,7 @@ running_args = {
 }
 
 if __name__ == '__main__':
-    test_model()
+    # test_model()
     wb = WorkBook(running_args["--num_exp"])
 
     origin_argv = sys.argv
@@ -76,7 +76,7 @@ if __name__ == '__main__':
         sys.argv.append(str(value))
     print(sys.argv)
     main(wb)
-
     wb.append('备注', 0, "全部数据,CIFAR10, ResNet18")
+    # wb.append('备注', 0, "全部数据,MNIST, ResNet")
     wb.to_excel('./excel/data_full.xlsx')
     print("end")

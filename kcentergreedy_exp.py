@@ -7,8 +7,8 @@ from random_remove_exp import test_model
 # running_args = {
 #     "--dataset": "MNIST",
 #     "--model": "LeNet",
-#     "--selection": "Uncertainty",
-#     "--num_exp": 10,
+#     "--selection": "kCenterGreedy",
+#     "--num_exp": 20,
 #     # "--num_exp": 2,
 #     "--num_eval": 1,
 #     # "--epochs": 20,
@@ -16,8 +16,8 @@ from random_remove_exp import test_model
 #     "--data_path": "data",
 #     "--gpu": 0,
 #     "--print_freq": 20,
-#     "--fraction": 0.05,
-#     "--workers": 8,
+#     "--fraction": 0.15,
+#     "--workers": 4,
 #     "--optimizer": "Adam",
 #     "--lr": 0.002,
 #     "--momentum": 0.0,
@@ -25,7 +25,7 @@ from random_remove_exp import test_model
 #     "--nesterov": False,
 #     "--train_batch": 256,
 #     "--test_interval": 1,
-#     "--selection_epochs": 25,
+#     "--selection_epochs": 2,
 #     # "--selection_epochs": 2,
 #     "--selection_momentum": 0.0,
 #     "--selection_weight_decay": 0.0,
@@ -39,8 +39,8 @@ from random_remove_exp import test_model
 running_args = {
     "--dataset": "CIFAR10",
     "--model": "ResNet18",
-    "--selection": "Uncertainty",
-    "--num_exp": 3,
+    "--selection": "kCenterGreedy",
+    "--num_exp": 20,
     # "--num_exp": 2,
     "--num_eval": 1,
     # "--epochs": 20,
@@ -48,28 +48,28 @@ running_args = {
     "--data_path": "data",
     "--gpu": 0,
     "--print_freq": 20,
-    "--fraction": 0.3,
-    "--workers": 4,
+    "--fraction": 0.1,
+    "--workers": 1,
     "--optimizer": "Adam",
     "--lr": 0.002,
     "--momentum": 0.0,
     "--weight_decay": 0.0,
     "--nesterov": False,
-    "--train_batch": 256,
+    "--train_batch": 128,
     "--test_interval": 1,
-    "--selection_epochs": 10,
+    "--selection_epochs": 25,
     # "--selection_epochs": 1,
     "--selection_momentum": 0.0,
     "--selection_weight_decay": 0.0,
     "--selection_optimizer": "Adam",
     "--selection_lr": 0.002,
     "--selection_test_interval": 1,
-    "--uncertainty": "LeastConfidence",
+    "--uncertainty": "Confidence",
     "--balance": True
 }
 
 if __name__ == '__main__':
-    test_model()
+    # test_model()
     wb = WorkBook(running_args["--num_exp"])
 
     origin_argv = sys.argv
@@ -80,9 +80,6 @@ if __name__ == '__main__':
         sys.argv.append(str(value))
     print(sys.argv)
     main(wb)
-    wb.append('备注', 0, "uncertainty, LeastConfidence, fraction: 0.3, model: ResNet18, dataset:CIFAR10, pretrain: "
-                       "True, selection epoch:10")
-    wb.to_excel('./excel/data_uncertainty_pretrain_LeastConfidence_30.xlsx')
-    # wb.append('备注', 0, "uncertainty, LeastConfidence, fraction: 0.05, model: LeNet, dataset:MNIST")
-    # wb.to_excel('./excel/data_uncertainty_LeastConfidence_05.xlsx')
+    wb.append('备注', 0, "kCenterGreedy, fraction: 0.1, model: ResNet18, dataset:CIFAR10")
+    wb.to_excel('./excel/data_kCenterGreedy_010.xlsx')
     print("end")

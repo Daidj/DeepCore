@@ -18,4 +18,8 @@ from .random import *
 from .NotDiff import *
 from .uncertainty_new import *
 from .mmd import *
+from .uncertaintyMMD import *
+from .uncertaintyKL import *
+from .uncertainty_denoise import *
+from .uncertainty_kcenter_denoise import *
 

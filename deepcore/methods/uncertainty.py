@@ -43,6 +43,7 @@ class Uncertainty(EarlyTrain):
             epoch, self.epochs, batch_idx + 1, (self.n_pretrain_size // batch_size) + 1, loss.item()))
 
     def finish_run(self):
+        # 分数越低质量越好
         if self.balance:
             selection_result = np.array([], dtype=np.int64)
             scores = []
@@ -53,7 +54,7 @@ class Uncertainty(EarlyTrain):
                                                                :round(len(class_index) * self.fraction)]])
         else:
             scores = self.rank_uncertainty()
-            selection_result = np.argsort(scores)[::-1][:self.coreset_size]
+            selection_result = np.argsort(scores)[:self.coreset_size]
         return {"indices": selection_result, "scores": scores}
 
     def rank_uncertainty(self, index=None):
@@ -80,7 +81,7 @@ class Uncertainty(EarlyTrain):
                     max_preds = preds.max(axis=1)
                     # print(max_preds)
                     # print(max_preds.shape)
-                    scores = np.append(scores, 1-max_preds)
+                    scores = np.append(scores, max_preds)
                 elif self.selection_method == 'Margin':
                     preds = torch.nn.functional.softmax(self.model(input.to(self.args.device)), dim=1)
                     preds_argmax = torch.argmax(preds, dim=1)

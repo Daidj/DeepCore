@@ -22,7 +22,13 @@ class LeNet(nn.Module):
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
-        self.fc_1 = nn.Linear(16 * 53 * 53 if im_size[0] == im_size[1] == 224 else 16 * 5 * 5, 120)
+        if im_size[0] == im_size[1] == 224:
+            dim = 53
+        elif im_size[0] == im_size[1] == 700:
+            dim = int(((im_size[0] / 2) - 2 - 4) / 2)
+        else:
+            dim = 5
+        self.fc_1 = nn.Linear(16 * dim * dim, 120)
         self.fc_2 = nn.Linear(120, 84)
         self.fc_3 = nn.Linear(84, num_classes)
 
