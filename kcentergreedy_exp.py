@@ -16,23 +16,24 @@ from random_remove_exp import test_model
 #     "--data_path": "data",
 #     "--gpu": 0,
 #     "--print_freq": 20,
-#     "--fraction": 0.15,
-#     "--workers": 4,
+#     "--fraction": 0.1,
+#     "--workers": 0,
 #     "--optimizer": "Adam",
 #     "--lr": 0.002,
 #     "--momentum": 0.0,
 #     "--weight_decay": 0.0,
 #     "--nesterov": False,
-#     "--train_batch": 256,
+#     "--train_batch": 128,
+#     "--selection_batch": 128,
 #     "--test_interval": 1,
-#     "--selection_epochs": 2,
-#     # "--selection_epochs": 2,
+#     # "--selection_epochs": 1,
+#     "--selection_epochs": 25,
 #     "--selection_momentum": 0.0,
 #     "--selection_weight_decay": 0.0,
 #     "--selection_optimizer": "Adam",
 #     "--selection_lr": 0.002,
 #     "--selection_test_interval": 1,
-#     "--uncertainty": "Confidence",
+#     "--uncertainty": "LeastConfidence",
 #     "--balance": True
 # }
 
@@ -40,7 +41,7 @@ running_args = {
     "--dataset": "CIFAR10",
     "--model": "ResNet18",
     "--selection": "kCenterGreedy",
-    "--num_exp": 20,
+    "--num_exp": 5,
     # "--num_exp": 2,
     "--num_eval": 1,
     # "--epochs": 20,
@@ -55,7 +56,8 @@ running_args = {
     "--momentum": 0.0,
     "--weight_decay": 0.0,
     "--nesterov": False,
-    "--train_batch": 128,
+    "--train_batch": 32,
+    "--selection_batch": 32,
     "--test_interval": 1,
     "--selection_epochs": 25,
     # "--selection_epochs": 1,
@@ -64,7 +66,7 @@ running_args = {
     "--selection_optimizer": "Adam",
     "--selection_lr": 0.002,
     "--selection_test_interval": 1,
-    "--uncertainty": "Confidence",
+    "--uncertainty": "LeastConfidence",
     "--balance": True
 }
 
@@ -80,6 +82,9 @@ if __name__ == '__main__':
         sys.argv.append(str(value))
     print(sys.argv)
     main(wb)
-    wb.append('备注', 0, "kCenterGreedy, fraction: 0.1, model: ResNet18, dataset:CIFAR10")
-    wb.to_excel('./excel/data_kCenterGreedy_010.xlsx')
+    # wb.append('备注', 0, "kCenterGreedy, fraction: 0.1, model: LeNet, dataset: MNIST, batch:32, worker:1")
+    # wb.to_excel('./excel/data_kCenterGreedy_10.xlsx')
+
+    wb.append('备注', 0, "kCenterGreedy, fraction: 0.1, model: ResNet18, dataset: CIFAR10, batch:32, worker:1")
+    wb.to_excel('./excel/data_kCenterGreedy_10.xlsx')
     print("end")

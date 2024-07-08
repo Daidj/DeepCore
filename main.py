@@ -143,7 +143,7 @@ def main(wb=None):
                                                                                          fr=args.fraction)
 
         print('\n================== Exp %d ==================\n' % exp)
-        print("dataset: ", args.dataset, ", model: ", args.model, ", selection: ", args.selection, ", num_ex: ",
+        print("dataset: ", args.dataset, ", model: ", args.model, ", selection: ", args.selection, ", num_exp: ",
               args.num_exp, ", epochs: ", args.epochs, ", fraction: ", args.fraction, ", seed: ", args.seed,
               ", lr: ", args.lr, ", save_path: ", args.save_path, ", resume: ", args.resume, ", device: ", args.device,
               ", checkpoint_name: " + checkpoint_name if args.save_path != "" else "", "\n", sep="")
@@ -218,8 +218,11 @@ def main(wb=None):
         for model in models:
             if len(models) > 1:
                 print("| Training on model %s" % model)
-
-            network = nets.__dict__[model](channel, num_classes, im_size, pretrained=False).to(args.device)
+            if model == 'TextCNN':
+                n_vocal = dst_train.n_vocab
+                network = nets.__dict__[model](num_classes, n_vocal).to(args.device)
+            else:
+                network = nets.__dict__[model](channel, num_classes, im_size, pretrained=False).to(args.device)
 
             if args.device == "cpu":
                 print("Using CPU.")

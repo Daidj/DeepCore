@@ -98,11 +98,15 @@ class EarlyTrain(CoresetMethod):
         self.train_indx = np.arange(self.n_train)
 
         # Setup model and loss
-        self.model = nets.__dict__[self.args.model if self.specific_model is None else self.specific_model](
-            self.args.channel, self.dst_pretrain_dict["num_classes"] if self.if_dst_pretrain else self.num_classes,
-            pretrained=self.torchvision_pretrain,
-            # pretrained=False,
-            im_size=(224, 224) if self.torchvision_pretrain else self.args.im_size).to(self.args.device)
+        if self.args.model == 'TextCNN':
+            n_vocal = self.dst_train.n_vocab
+            self.model = nets.__dict__[self.args.model](self.dst_train.num_classes, n_vocal).to(self.args.device)
+        else:
+            self.model = nets.__dict__[self.args.model if self.specific_model is None else self.specific_model](
+                self.args.channel, self.dst_pretrain_dict["num_classes"] if self.if_dst_pretrain else self.num_classes,
+                pretrained=self.torchvision_pretrain,
+                # pretrained=False,
+                im_size=(224, 224) if self.torchvision_pretrain else self.args.im_size).to(self.args.device)
 
         if self.args.device == "cpu":
             print("Using CPU.")

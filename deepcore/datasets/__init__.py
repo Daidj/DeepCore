@@ -7,3 +7,5 @@ from .qmnist import *
 from .svhn import *
 from .tinyimagenet import *
 from .medical import *
+from .thucnews import *
+from .sst2 import *

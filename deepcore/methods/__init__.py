@@ -22,4 +22,6 @@ from .uncertaintyMMD import *
 from .uncertaintyKL import *
 from .uncertainty_denoise import *
 from .uncertainty_kcenter_denoise import *
+from .heuristic import *
+from .moea_d_ldea import *
 
