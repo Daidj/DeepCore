@@ -106,7 +106,7 @@ def test(test_loader, network, criterion, epoch, args, rec):
                 i, len(test_loader), batch_time=batch_time, loss=losses,
                 top1=top1))
 
-    print(' * Prec@1 {top1.avg:.3f}'.format(top1=top1))
+    print('Loss {loss.avg:.4f} * Prec@1 {top1.avg:.3f}'.format(loss=losses, top1=top1))
 
     network.no_grad = False
 

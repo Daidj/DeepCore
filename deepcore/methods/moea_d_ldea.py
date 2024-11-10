@@ -12,6 +12,7 @@ from cleanlab.filter import find_label_issues
 from cleanlab import Datalab
 from scipy.stats import gaussian_kde, entropy
 from numpy import linspace
+from sklearn.decomposition import PCA
 from torch.utils.data import TensorDataset
 
 from mmd_algorithm import MMD
@@ -21,12 +22,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from .methods_utils import *
+from ..nets.nets_utils import MyDataParallel
 
 MAX_ENTROPY_ALLOWED = 1e6  # A hack to never deal with inf entropy values that happen when the PDFs don't intersect
 test_data_folder = 'test_data'
-
-
-
 
 
 def bubble_sort(arr):
@@ -39,16 +38,25 @@ def bubble_sort(arr):
 
 
 def plot_nested_list(nested_list, diff=None, important_points=None, title='X-Y', folder_name='test_data'):
+    if len(nested_list[0]) != 2:
+        return
     x = [point[0] for point in nested_list]
     y = [point[1] for point in nested_list]
     plt.figure(figsize=(8, 6))
-
+    min_x = min(x)
+    max_x = max(x)
+    min_y = min(y)
+    max_y = max(y)
     plt.scatter(x, y, s=5, c='b')
     # for i, j in zip(x, y):
     #     plt.annotate(f'({i:.2f},{j:.2f})', (i, j))
     if diff != None:
         diff_x = [point[0] for point in diff]
         diff_y = [point[1] for point in diff]
+        min_x = min(min_x, min(diff_x))
+        max_x = max(max_x, max(diff_x))
+        min_y = min(min_y, min(diff_y))
+        max_y = max(max_y, max(diff_y))
         plt.scatter(diff_x, diff_y, s=5, c='r')
         for i, j in zip(diff_x, diff_y):
             plt.annotate(f'({i:.4f},{j:.4f})', (i, j), color='red')
@@ -56,12 +64,16 @@ def plot_nested_list(nested_list, diff=None, important_points=None, title='X-Y',
     if important_points != None:
         important_x = [point[0] for point in important_points]
         important_y = [point[1] for point in important_points]
+        min_x = min(min_x, min(important_x))
+        max_x = max(max_x, max(important_x))
+        min_y = min(min_y, min(important_y))
+        max_y = max(max_y, max(important_y))
         plt.scatter(important_x, important_y, s=5, c='g')
         for i, j in zip(important_x, important_y):
             plt.annotate(f'({i:.4f},{j:.4f})', (i, j), color='green')
 
-    plt.xlim(0, 1)
-    plt.ylim(0, 1)
+    plt.xlim(min_x-0.2*(max_x-min_x), max_x+0.2*(max_x-min_x))
+    plt.ylim(min_y-0.2*(max_y-min_y), max_y+0.2*(max_y-min_y))
     plt.xlabel('X')
     plt.ylabel('Y')
     plt.title(title)
@@ -82,11 +94,17 @@ class Individual:
         self.gene = set()
         self.unselected_gene = set(torch.arange(total_gene_num).numpy())
         self.target_num = target_num
+        self.step_rate = 0.1
         self.fitness = None
 
     def clone(self):
         copy_ind = copy.deepcopy(self)
         return copy_ind
+
+    def crossover_new(self):
+        # gene_room: int -> set()
+        pass
+
 
     def crossover(self, other):
         if self.gene == other.gene:
@@ -125,10 +143,11 @@ class Individual:
         self.set_fitness()
 
     def local_search(self, weight_vector):
-        print(self.fitness, " local search: ")
+        print(self.fitness, " local search: ", weight_vector)
+        search_num = max(1, round(0.01 * self.gene_num * random.uniform(0, 0.25)))
         child = self.clone()
-        child.__remove_worst(weight_vector)
-        child.__greedy_search(weight_vector, 1)
+        child.__remove_worst(weight_vector, search_num)
+        child.__greedy_search(weight_vector, search_num)
         child.set_fitness()
         if child < self:
             print("search better")
@@ -155,7 +174,18 @@ class Individual:
             print("search equal")
         return child
 
-    def __remove_worst(self, weight_vector):
+    def __remove_worst(self, weight_vector, num=1):
+        score_array = torch.stack([c.selected_fitness(self).float() for c in self.fitness_calculators], dim=0).to(
+            self.device)
+        res = torch.matmul(score_array.T, weight_vector.unsqueeze(1))
+        res = res.squeeze(1)
+        _, indices = torch.topk(res, k=num)
+        l = list(self.gene)
+        selected = set([l[i] for i in indices])
+        self.gene.difference_update(selected)
+        self.unselected_gene.update(selected)
+
+    def __remove_worst_old(self, weight_vector):
         score_array = torch.stack([c.selected_fitness(self).float() for c in self.fitness_calculators], dim=0).to(
             self.device)
         res = torch.matmul(score_array.T, weight_vector.unsqueeze(1))
@@ -167,9 +197,26 @@ class Individual:
     def __greedy_search(self, weight_vector, num):
 
         if len(self.gene) == 0:
+            selected = set(random.sample(list(self.unselected_gene), num))
+            self.gene.update(selected)
+            self.unselected_gene.difference_update(selected)
+            return
+        score_array = torch.stack([c.unselected_fitness(self).float() for c in self.fitness_calculators], dim=0).to(
+            self.device)
+        res = torch.matmul(score_array.T, weight_vector.unsqueeze(1))
+        res = res.squeeze(1)
+        _, indices = torch.topk(res, k=num, largest=False)
+        l = list(self.unselected_gene)
+        selected = set([l[i] for i in indices])
+        self.gene.update(selected)
+        self.unselected_gene.difference_update(selected)
+
+    def __greedy_search_old(self, weight_vector, num):
+
+        if len(self.gene) == 0:
             selected = random.choice(list(self.unselected_gene))
             self.gene.add(selected)
-            self.unselected_gene.discard(selected)
+            self.unselected_gene.remove(selected)
             num -= 1
         for i in range(num):
             score_array = torch.stack([c.unselected_fitness(self).float() for c in self.fitness_calculators], dim=0).to(
@@ -178,7 +225,7 @@ class Individual:
             res = res.squeeze(1)
             selected = list(self.unselected_gene)[torch.argmin(res)]
             self.gene.add(selected)
-            self.unselected_gene.discard(selected)
+            self.unselected_gene.remove(selected)
 
     def greedy_init(self, weight_vector, fraction=None):
         init_num = self.gene_num
@@ -187,7 +234,10 @@ class Individual:
             self.gene = set(random.sample(list(Individual.last_init_individual), sample_num))
             self.unselected_gene = self.unselected_gene - self.gene
             init_num = self.gene_num - sample_num
-        self.__greedy_search(weight_vector, init_num)
+        while init_num > 0:
+            step = max(1, round(init_num*self.step_rate))
+            self.__greedy_search(weight_vector, step)
+            init_num -= step
 
         Individual.last_init_individual = self.gene
         print('init finish: ', fraction)
@@ -223,7 +273,7 @@ class Individual:
         return dot_product.item()
 
     def set_fitness(self):
-        self.fitness = [round(calculator.fitness(self), 4) for calculator in self.fitness_calculators]
+        self.fitness = [round(calculator.fitness(self), 5) for calculator in self.fitness_calculators]
     # def compare_individual(individual_1, individual_2):
     #     if all(a <= b for a, b in zip(individual_1, individual_2)):
     #         return -1
@@ -235,7 +285,10 @@ class SubProblems:
     def __init__(self, target_num, count, device):
         self.target_num = target_num
         # self.unit_vectors = torch.eye(self.target_num).to(device)
-        self.unit_vectors = torch.cat([torch.eye(self.target_num), torch.tensor([[1 / 2 ** 0.5, 1 / 2 ** 0.5]])],
+        if target_num == 1:
+            self.unit_vectors = torch.eye(target_num).to(device)
+        elif target_num == 2:
+            self.unit_vectors = torch.cat([torch.eye(self.target_num), torch.tensor([[1 / 2 ** 0.5, 1 / 2 ** 0.5]])],
                                       dim=0).to(device)
 
         self.regions = []
@@ -248,7 +301,11 @@ class SubProblems:
         problems = []
         min_fraction = 1e-4
         max_fraction = 0.9999
-        if target_num == 2:
+        if target_num == 1:
+            for i in range(count):
+                weight_vector = [1.0]
+                problems.append(weight_vector)
+        elif target_num == 2:
             step = (max_fraction - min_fraction) / (count - 1)
             for i in range(count):
                 weight_vector = [min_fraction + i * step, 1 - min_fraction - i * step]
@@ -272,7 +329,7 @@ class SubProblems:
         # (50, 2) . (2, 2) => (50, 2)
         dot_products = torch.matmul(self.weight_vectors, self.unit_vectors.T)
         max_indices = torch.argmax(dot_products, dim=1)
-        for i in range(self.target_num):
+        for i in range(self.unit_vectors.size()[0]):
             indices = torch.where(max_indices == i)[0]
             indices = indices.cpu().numpy()
             self.regions.append(set(indices))
@@ -296,6 +353,8 @@ class MODE:
         for i in range(population_num):
             individual = Individual(total_gene_num=self.total_gene_num, gene_num=self.gene_num,
                                     target_num=self.target_num)
+            # individual.random_init()
+            # print('random: ', individual.fitness)
             if i % 10 == 0:
                 individual.greedy_init(self.subproblems.weight_vectors[i])
             else:
@@ -308,7 +367,6 @@ class MODE:
 
         self.best_solution = []
         self.best_solution_to_subproblem = []
-        self.last_best_index = -1
         self.count_set = np.ones(self.population_num)
         for i in range(population_num):
             current = self.best_population_for_subproblems[i]
@@ -321,6 +379,7 @@ class MODE:
                 self.count_set[i] = self.count_set[i] + 1
                 self.best_solution.append(current)
                 self.best_solution_to_subproblem.append(i)
+        self.last_best_index = int(len(self.best_solution)/2)
         self.device = device
         self.greedy_best = []
         for calculator in fitness_calculators:
@@ -331,6 +390,8 @@ class MODE:
         self.output_folder = output_folder
 
     def get_best_in_solution(self):
+        # print("greedy best: ", self.greedy_best_fitness_points)
+        # 最大优化值
         # fitness_front = [p.fitness for p in self.best_solution]
         # front_tensor = torch.tensor(fitness_front)
         # greedy_best = torch.tensor(self.greedy_best_fitness_points)
@@ -349,28 +410,69 @@ class MODE:
 
         # fitness_front = [p.fitness for p in self.best_solution]
         # front_tensor = torch.tensor(fitness_front)
-        # best = torch.argmin(front_tensor[:, -1])
+        # best = torch.argmin(front_tensor[:, 0])
 
+        # 最大优化空间
+        # TOPSIS
+        # fitness_front = [p.fitness for p in self.best_solution]
+        # front_tensor = torch.tensor(fitness_front)
+        # greedy_best = torch.tensor(self.greedy_best_fitness_points)
+        # best_point = torch.min(greedy_best, dim=0).values
+        # worst_point = torch.max(greedy_best, dim=0).values
+        # scores = torch.sum((front_tensor - best_point) / (worst_point - best_point), dim=1)
+        # best = torch.argmin(scores)
+
+
+        # 比例优化空间
+        fraction = torch.tensor([0.5, 0.5])
         fitness_front = [p.fitness for p in self.best_solution]
         front_tensor = torch.tensor(fitness_front)
         greedy_best = torch.tensor(self.greedy_best_fitness_points)
-        best_point = torch.min(greedy_best, dim=0).values
-        worst_point = torch.max(greedy_best, dim=0).values
-        scores = torch.sum((front_tensor - best_point) / (worst_point - best_point), dim=1)
+        best_point = torch.min(front_tensor, dim=0).values
+        worst_point = torch.max(front_tensor, dim=0).values
+        scores = (front_tensor - best_point) / (worst_point - best_point)
+
+        fraction_matrix = fraction.unsqueeze(0).repeat(scores.size(0), 1)
+        scores = torch.sum(scores * fraction_matrix, dim=1)
         best = torch.argmin(scores)
+
+        # 分布优先的
+
+        # greedy_best = torch.tensor(self.greedy_best_fitness_points)
+        # best_point = torch.min(greedy_best, dim=0).values
+        # worst_point = torch.max(greedy_best, dim=0).values
+        # print('best point: ', best_point)
+        # fitness_front = [p.fitness if p.fitness[0] <= best_point[0] else worst_point.tolist() for p in self.best_solution]
+        # # print(fitness_front)
+        # front_tensor = torch.tensor(fitness_front)
+        # best = torch.argmin(front_tensor[:, -1])
         return best
 
+    def update_best_solution(self):
+
+        final_best_solution = []
+        for i in range(len(self.best_solution)):
+            current = self.best_solution[i]
+            nondeminated = True
+            for other in self.best_solution:
+                if current > other:
+                    nondeminated = False
+                    break
+            if nondeminated:
+                final_best_solution.append(current)
+        self.best_solution = final_best_solution
+        print("update best solution: ", len(self.best_solution))
+
     def solve(self, iter=50):
-        # 子空间数量
-        subregions_num = self.target_num
         L = 10
         utility = np.ones((self.population_num, L))
 
-        beta = min(self.target_num / 10, 0.8)
+        beta = min(self.target_num / 5, 0.8)
         for i in range(iter):
             print("Iter:", i)
+            utility[:, i % L] = 1
             for opr in range(self.population_num):
-                utility[:, i % L] = 1
+
                 regions = self.subproblems.regions
                 local_probability = np.array([])
                 for region in regions:
@@ -381,8 +483,12 @@ class MODE:
                     selected_subproblem = random.choice(list(self.subproblems.regions[selected_region]))
 
                 else:
-                    utility_sum = np.sum(utility, axis=1)
-                    selected_subproblem = np.argmax(utility_sum)
+                    if i == 0 and opr < 0.5 * L:
+                        print("random subproblem")
+                        selected_subproblem = random.randint(0, self.population_num-1)
+                    else:
+                        utility_sum = np.sum(utility, axis=1)
+                        selected_subproblem = np.argmax(utility_sum)
                 print('subprobleam: ', selected_subproblem)
                 parent_1 = self.best_population_for_subproblems[selected_subproblem]
                 neighboring = random.choice(list(self.subproblems.neighbors[selected_subproblem]))
@@ -396,9 +502,10 @@ class MODE:
                 new_population = [parent_1, parent_2, child_1, child_2, child_3, child_4]
                 new_population_subproblems = [selected_subproblem if i % 2 == 0 else neighboring for i in
                                               range(len(new_population))]
-                new_population.append(self.best_solution[self.last_best_index].local_search(
-                    self.subproblems.weight_vectors[self.best_solution_to_subproblem[self.last_best_index]]))
-                new_population_subproblems.append(self.best_solution_to_subproblem[self.last_best_index])
+                if opr % 5 == 0:
+                    new_population.append(self.best_solution[self.last_best_index].local_search(
+                        self.subproblems.weight_vectors[self.best_solution_to_subproblem[self.last_best_index]]))
+                    new_population_subproblems.append(self.best_solution_to_subproblem[self.last_best_index])
                 single_objective_1 = np.array(
                     [p.get_single_fitness(self.subproblems.weight_vectors[selected_subproblem]) for p in
                      new_population])
@@ -425,32 +532,24 @@ class MODE:
                         if not replaced:
                             self.best_solution.append(current)
                             self.best_solution_to_subproblem.append(new_population_subproblems[j])
-                        self.count_set[selected_subproblem] = self.count_set[selected_subproblem] + 1
+                        self.count_set[new_population_subproblems[j]] = self.count_set[new_population_subproblems[j]] + 1
                     if not current > new_population[0]:
                         utility[selected_subproblem][i % L] = utility[selected_subproblem][i % L] + 1
-
+            # if i % 5 == 4:
+            #     self.update_best_solution()
             fitness_front = [p.fitness for p in self.best_solution]
             subproblems_front = [p.fitness for p in self.best_population_for_subproblems]
             best = self.get_best_in_solution()
             self.last_best_index = best
             if i % 10 == 0:
-                # plot_nested_list(subproblems_front, diff=self.greedy_best_fitness_points, title="Iter_subproblems_{}".format(i), folder_name=self.output_folder)
+                plot_nested_list(subproblems_front, diff=self.greedy_best_fitness_points, title="Iter_subproblems_{}".format(i), important_points=[self.best_solution[best].fitness], folder_name=self.output_folder)
                 plot_nested_list(fitness_front, diff=self.greedy_best_fitness_points, title="Iter_pareto_{}".format(i),
                                  important_points=[self.best_solution[best].fitness], folder_name=self.output_folder)
 
-        final_best_solution = []
-        for i in range(len(self.best_solution)):
-            current = self.best_solution[i]
-            nondeminated = True
-            for other in self.best_solution:
-                if current > other:
-                    nondeminated = False
-                    break
-            if nondeminated:
-                final_best_solution.append(current)
-        self.best_solution = final_best_solution
+        self.update_best_solution()
         # 对帕累托前沿的点进行评分并选择最优解
         best = self.get_best_in_solution()
+        fitness_front = [p.fitness for p in self.best_solution]
         best_individual = self.best_solution[best]
         best_fitness = best_individual.fitness
         print("best fitness: ", best_fitness)
@@ -458,9 +557,6 @@ class MODE:
                          title="final_pareto", folder_name=self.output_folder)
         print("fitness front: ", len(fitness_front))
         return np.array(list(best_individual.gene)), best_fitness
-
-
-
 
 
 class MOEA(EarlyTrain):
@@ -483,7 +579,11 @@ class MOEA(EarlyTrain):
         pass
 
     def after_loss(self, outputs, loss, targets, batch_inds, epoch):
-        pass
+        with torch.no_grad():
+            _, predicted = torch.max(outputs.data, 1)
+
+            cur_acc = (predicted != targets).clone().detach().requires_grad_(False).type(torch.float32)
+            self.error_events[batch_inds] = self.error_events[batch_inds] + cur_acc
 
     def before_epoch(self):
         pass
@@ -492,7 +592,7 @@ class MOEA(EarlyTrain):
         pass
 
     def before_run(self):
-        pass
+        self.error_events = torch.ones(self.n_train, requires_grad=False).to(self.args.device)
 
     def num_classes_mismatch(self):
         raise ValueError("num_classes of pretrain dataset does not match that of the training dataset.")
@@ -501,16 +601,6 @@ class MOEA(EarlyTrain):
         if batch_idx % self.args.print_freq == 0:
             print('| Epoch [%3d/%3d] Iter[%3d/%3d]\t\tLoss: %.4f' % (
                 epoch, self.epochs, batch_idx + 1, (self.n_pretrain_size // batch_size) + 1, loss.item()))
-
-    def write_file(self, class_index, scores, id, name='class'):
-        folder_name = 'test_data'
-        os.makedirs(folder_name, exist_ok=True)
-        file_path = os.path.join(folder_name, '{}_{}.pkl'.format(name, id))
-        my_array = class_index[np.argsort(scores[-1])]
-        with open(file_path, 'wb') as file:
-            pickle.dump(my_array, file)
-        # with open(file_path, 'rb') as file:
-        #     loaded_array = pickle.load(file)
 
     def construct_matrix(self, index=None):
         self.model.eval()
@@ -526,11 +616,13 @@ class MOEA(EarlyTrain):
                                                           batch_size=self.args.selection_batch,
                                                           num_workers=self.args.workers)
 
-                for i, (inputs, _) in enumerate(data_loader):
+                for i, (inputs, labels) in enumerate(data_loader):
                     outputs = self.model(inputs.to(self.args.device))
-                    matrix.append(self.model.embedding_recorder.embedding)
+                    matrix.append(outputs)
+                    # matrix.append(self.model.embedding_recorder.embedding)
+                    row_indices = torch.arange(outputs.size(0))
                     if self.selection_method == "LeastConfidence":
-                        scores = np.append(scores, outputs.max(axis=1).values.cpu().numpy())
+                        scores = np.append(scores, outputs[[row_indices, labels]].cpu().numpy())
                     elif self.selection_method == "Entropy":
                         preds = torch.nn.functional.softmax(outputs, dim=1).cpu().numpy()
                         scores = np.append(scores, (np.log(preds + 1e-6) * preds).sum(axis=1))
@@ -545,24 +637,33 @@ class MOEA(EarlyTrain):
         return torch.cat(matrix, dim=0), scores
 
     def finish_run(self):
+        if isinstance(self.model, MyDataParallel):
+            self.model = self.model.module
+
         if self.balance:
             selection_result = np.array([], dtype=np.int64)
             scores = []
-            # if type(self.dst_train.data) == torch.Tensor:
-            #     data = self.dst_train.data.reshape(self.dst_train.data.shape[0], -1).to(device='cuda')
-            # elif type(self.dst_train.data) == np.ndarray:
-            #     data = torch.from_numpy(self.dst_train.data.reshape(self.dst_train.data.shape[0], -1)).to(device='cuda')
             for c in range(self.args.num_classes):
                 test_data_folder = 'test_data/{}'.format(c)
                 class_index = np.arange(self.n_train)[self.dst_train.targets == c]
-                features_matrix, importance = self.construct_matrix(class_index)
+                features_matrix, confidence = self.construct_matrix(class_index)
+                # data = features_matrix.cpu().numpy()
+                # pca = PCA(n_components=1)
+                # features_transformed = pca.fit_transform(data).ravel()
+                # frequency = self.error_events.cpu().numpy()[class_index]
                 size = round(len(class_index) * self.fraction)
                 time1 = time.time()
-                fitness_calculators = [RepresentativenessCalculator(features_matrix, size, device='cuda'),
-                                       DiversityCalculator(features_matrix, size, device='cuda')]
+                # fitness_calculators = [RepresentativenessCalculator(features_matrix, size, device='cuda'),
+                #                        DiversityCalculator(features_matrix, size, device='cuda')]
+                fitness_calculators = [MMDCalculator(features_matrix, size, device='cuda'),
+                                       MMDCalculator(features_matrix, size, device='cuda')]
+                # fitness_calculators = [KLCalculator(importance, size, device='cuda'),
+                #                        DiversityCalculator(features_matrix, size, device='cuda')]
+                # fitness_calculators = [MMDCalculator(features_matrix, size, device='cuda'),
+                #                        DiversityCalculator(features_matrix, size, device='cuda')]
                 # fitness_calculators = [UniquenessCalculator(importance, size, device='cuda'),
-                #                        RepresentativenessCalculator(features_matrix, size, device='cuda')]
-                # fitness_calculators = [UniquenessCalculator(importance, size, device='cuda'),
+                #                        MMDCalculator(features_matrix, size, device='cuda')]
+                # fitness_calculators = [UniquenessCalculator(confidence, size, device='cuda'),
                 #                        DiversityCalculator(features_matrix, size, device='cuda')]
                 solver = MODE(fitness_calculators=fitness_calculators, total_gene_num=len(class_index), budget=size,
                               device='cuda',
@@ -572,6 +673,13 @@ class MOEA(EarlyTrain):
                 print("heuristic fitness: ", heuristic_fitness)
                 print("heuristic time: ", time2 - time1)
                 best_result = class_index[res_heuristic]
+
+                os.makedirs(test_data_folder, exist_ok=True)
+                best_file_path = os.path.join(test_data_folder, 'best_{}.npy'.format(self.args.dataset))
+                np.save(best_file_path, best_result)
+                torch.save(features_matrix, os.path.join(test_data_folder, 'features_matrix_{}.pth'.format(self.args.dataset)))
+                torch.save(confidence, os.path.join(test_data_folder, 'importance_{}.pth'.format(self.args.dataset)))
+
                 print("best size:", len(best_result))
                 selection_result = np.append(selection_result, best_result)
         else:

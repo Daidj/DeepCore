@@ -1,7 +1,7 @@
 from .earlytrain import EarlyTrain
 import torch
 import numpy as np
-from .methods_utils import euclidean_dist
+from .methods_utils import euclidean_dist, euclidean_dist_for_batch
 from ..nets.nets_utils import MyDataParallel
 
 
@@ -47,7 +47,7 @@ def k_center_greedy(matrix, budget: int, metric, device, random_seed=None, index
         # each clustering center.
         dis_matrix = -1 * torch.ones([num_of_already_selected + budget - 1, sample_num], requires_grad=False).to(device)
 
-        dis_matrix[:num_of_already_selected, ~select_result] = metric(matrix[select_result], matrix[~select_result])
+        dis_matrix[:num_of_already_selected, ~select_result] = metric(matrix[select_result], matrix[~select_result]).to(device)
 
         mins = torch.min(dis_matrix[:num_of_already_selected, :], dim=0).values
 
@@ -67,8 +67,8 @@ def k_center_greedy(matrix, budget: int, metric, device, random_seed=None, index
 
 class kCenterGreedy(EarlyTrain):
     def __init__(self, dst_train, args, fraction=0.5, random_seed=None, epochs=0,
-                 specific_model="ResNet18", balance: bool = False, already_selected=[], metric="euclidean",
-                 torchvision_pretrain: bool = True, **kwargs):
+                 specific_model=None, balance: bool = False, already_selected=[], metric="euclidean",
+                 torchvision_pretrain: bool = False, **kwargs):
         super().__init__(dst_train, args, fraction, random_seed, epochs=epochs, specific_model=specific_model,
                          torchvision_pretrain=torchvision_pretrain, **kwargs)
 
@@ -80,11 +80,11 @@ class kCenterGreedy(EarlyTrain):
         self.min_distances = None
 
         if metric == "euclidean":
-            self.metric = euclidean_dist
+            self.metric = euclidean_dist_for_batch
         elif callable(metric):
             self.metric = metric
         else:
-            self.metric = euclidean_dist
+            self.metric = euclidean_dist_for_batch
             self.run = lambda : self.finish_run()
             def _construct_matrix(index=None):
                 data_loader = torch.utils.data.DataLoader(
@@ -140,7 +140,8 @@ class kCenterGreedy(EarlyTrain):
                                     num_workers=self.args.workers)
 
                 for i, (inputs, _) in enumerate(data_loader):
-                    self.model(inputs.to(self.args.device))
+                    outputs = self.model(inputs.to(self.args.device))
+                    # matrix.append(outputs)
                     matrix.append(self.model.embedding_recorder.embedding)
 
         self.model.no_grad = False

@@ -3,20 +3,20 @@ import sys
 from WorkBook import WorkBook
 from main import main
 from random_remove_exp import test_model
-
+#
 running_args = {
     "--dataset": "MNIST",
     "--model": "LeNet",
-    "--selection": "Random",
-    # "--num_exp": 5,
+    "--selection": "TwoStageSearch",
+    # "--num_exp": 20,
     "--num_exp": 1,
     "--num_eval": 1,
-    # "--epochs": 2,
+    # "--epochs": 20,
     "--epochs": 200,
     "--data_path": "data",
     "--gpu": 0,
     "--print_freq": 20,
-    "--fraction": 0.01,
+    "--fraction": 0.1,
     "--workers": 8,
     "--optimizer": "Adam",
     "--lr": 0.002,
@@ -26,59 +26,30 @@ running_args = {
     "--train_batch": 256,
     "--selection_batch": 256,
     "--test_interval": 1,
+    # "--selection_epochs": 1,
     "--selection_epochs": 25,
-    # "--selection_epochs": 2,
     "--selection_momentum": 0.0,
     "--selection_weight_decay": 0.0,
     "--selection_optimizer": "Adam",
     "--selection_lr": 0.002,
     "--selection_test_interval": 1,
+    "--uncertainty": "Entropy",
     "--balance": True
 }
 
 # running_args = {
-#     "--dataset": "CIFAR100",
-#     "--model": "ResNet18",
-#     "--selection": "Random",
-#     # "--num_exp": 20,
-#     "--num_exp": 5,
-#     "--num_eval": 1,
-#     # "--epochs": 2,
-#     "--epochs": 200,
-#     "--data_path": "data",
-#     "--gpu": 0,
-#     "--print_freq": 20,
-#     "--fraction": 1.0,
-#     "--workers": 4,
-#     "--optimizer": "Adam",
-#     "--lr": 0.002,
-#     "--momentum": 0.0,
-#     "--weight_decay": 0.0,
-#     "--nesterov": False,
-#     "--train_batch": 256,
-#     "--test_interval": 1,
-#     "--selection_epochs": 25,
-#     "--selection_momentum": 0.0,
-#     "--selection_weight_decay": 0.0,
-#     "--selection_optimizer": "Adam",
-#     "--selection_lr": 0.002,
-#     "--selection_test_interval": 1,
-#     "--balance": True
-# }
-
-# running_args = {
 #     "--dataset": "CIFAR10",
 #     "--model": "ResNet18",
-#     "--selection": "Random",
-#     # "--num_exp": 20,
-#     "--num_exp": 5,
+#     "--selection": "TwoStageSearch",
+#     "--num_exp": 1,
+#     # "--num_exp": 5,
 #     "--num_eval": 1,
-#     # "--epochs": 2,
+#     # "--epochs": 20,
 #     "--epochs": 200,
 #     "--data_path": "data",
 #     "--gpu": 0,
 #     "--print_freq": 20,
-#     "--fraction": 0.9,
+#     "--fraction": 0.1,
 #     "--workers": 4,
 #     "--optimizer": "Adam",
 #     "--lr": 0.002,
@@ -86,29 +57,32 @@ running_args = {
 #     "--weight_decay": 0.0,
 #     "--nesterov": False,
 #     "--train_batch": 256,
+#     "--selection_batch": 256,
 #     "--test_interval": 1,
 #     "--selection_epochs": 25,
+#     # "--selection_epochs": 1,
 #     "--selection_momentum": 0.0,
 #     "--selection_weight_decay": 0.0,
 #     "--selection_optimizer": "Adam",
 #     "--selection_lr": 0.002,
 #     "--selection_test_interval": 1,
+#     "--uncertainty": "Entropy",
 #     "--balance": True
 # }
 
 # running_args = {
-#     "--dataset": "TinyImageNet",
+#     "--dataset": "CIFAR100",
 #     "--model": "ResNet18",
-#     "--selection": "Random",
+#     "--selection": "TwoStageSearch",
 #     # "--num_exp": 20,
-#     "--num_exp": 5,
+#     "--num_exp": 1,
 #     "--num_eval": 1,
 #     # "--epochs": 2,
 #     "--epochs": 200,
 #     "--data_path": "data",
 #     "--gpu": 0,
 #     "--print_freq": 20,
-#     "--fraction": 1.0,
+#     "--fraction": 0.1,
 #     "--workers": 4,
 #     "--optimizer": "Adam",
 #     "--lr": 0.002,
@@ -116,68 +90,9 @@ running_args = {
 #     "--weight_decay": 0.0,
 #     "--nesterov": False,
 #     "--train_batch": 256,
+#     "--selection_batch": 256,
 #     "--test_interval": 1,
 #     "--selection_epochs": 25,
-#     "--selection_momentum": 0.0,
-#     "--selection_weight_decay": 0.0,
-#     "--selection_optimizer": "Adam",
-#     "--selection_lr": 0.002,
-#     "--selection_test_interval": 1,
-#     "--balance": True
-# }
-
-# running_args = {
-#     "--dataset": "THUCNews",
-#     "--model": "TextCNN",
-#     "--selection": "Random",
-#     "--num_exp": 20,
-#     # "--num_exp": 1,
-#     "--num_eval": 1,
-#     # "--epochs": 10,
-#     "--epochs": 100,
-#     "--data_path": "data",
-#     "--gpu": 0,
-#     "--print_freq": 20,
-#     "--fraction": 0.7,
-#     "--workers": 8,
-#     "--optimizer": "Adam",
-#     "--lr": 0.002,
-#     "--momentum": 0.0,
-#     "--weight_decay": 0.0,
-#     "--nesterov": False,
-#     "--train_batch": 4096,
-#     "--test_interval": 1,
-#     "--selection_epochs": 12,
-#     "--selection_momentum": 0.0,
-#     "--selection_weight_decay": 0.0,
-#     "--selection_optimizer": "Adam",
-#     "--selection_lr": 0.002,
-#     "--selection_test_interval": 1,
-#     "--balance": True
-# }
-
-# running_args = {
-#     "--dataset": "SST2",
-#     "--model": "TextCNN",
-#     "--selection": "Random",
-#     "--num_exp": 20,
-#     # "--num_exp": 1,
-#     "--num_eval": 1,
-#     # "--epochs": 10,
-#     "--epochs": 100,
-#     "--data_path": "data",
-#     "--gpu": 0,
-#     "--print_freq": 20,
-#     "--fraction": 0.5,
-#     "--workers": 8,
-#     "--optimizer": "Adam",
-#     "--lr": 0.002,
-#     "--momentum": 0.0,
-#     "--weight_decay": 0.0,
-#     "--nesterov": False,
-#     "--train_batch": 2048,
-#     "--test_interval": 1,
-#     "--selection_epochs": 12,
 #     "--selection_momentum": 0.0,
 #     "--selection_weight_decay": 0.0,
 #     "--selection_optimizer": "Adam",
@@ -189,16 +104,16 @@ running_args = {
 # running_args = {
 #     "--dataset": "SST5",
 #     "--model": "TextCNN",
-#     "--selection": "Random",
-#     "--num_exp": 20,
-#     # "--num_exp": 1,
+#     "--selection": "TwoStageSearch",
+#     # "--num_exp": 20,
+#     "--num_exp": 1,
 #     "--num_eval": 1,
 #     # "--epochs": 10,
 #     "--epochs": 200,
 #     "--data_path": "data",
 #     "--gpu": 0,
 #     "--print_freq": 20,
-#     "--fraction": 0.7,
+#     "--fraction": 0.5,
 #     "--workers": 8,
 #     "--optimizer": "Adam",
 #     "--lr": 0.002,
@@ -206,8 +121,10 @@ running_args = {
 #     "--weight_decay": 0.0,
 #     "--nesterov": False,
 #     "--train_batch": 256,
+#     "--selection_batch": 256,
 #     "--test_interval": 1,
 #     "--selection_epochs": 25,
+#     # "--selection_epochs": 2,
 #     "--selection_momentum": 0.0,
 #     "--selection_weight_decay": 0.0,
 #     "--selection_optimizer": "Adam",
@@ -219,7 +136,7 @@ running_args = {
 # running_args = {
 #     "--dataset": "YELP",
 #     "--model": "TextCNN",
-#     "--selection": "Random",
+#     "--selection": "TwoStageSearch",
 #     "--num_exp": 5,
 #     # "--num_exp": 1,
 #     "--num_eval": 1,
@@ -236,8 +153,10 @@ running_args = {
 #     "--weight_decay": 0.0,
 #     "--nesterov": False,
 #     "--train_batch": 256,
+#     "--selection_batch": 256,
 #     "--test_interval": 1,
 #     "--selection_epochs": 25,
+#     # "--selection_epochs": 2,
 #     "--selection_momentum": 0.0,
 #     "--selection_weight_decay": 0.0,
 #     "--selection_optimizer": "Adam",
@@ -249,7 +168,7 @@ running_args = {
 # running_args = {
 #     "--dataset": "AGNews",
 #     "--model": "TextCNN",
-#     "--selection": "Random",
+#     "--selection": "TwoStageSearch",
 #     "--num_exp": 5,
 #     # "--num_exp": 1,
 #     "--num_eval": 1,
@@ -258,7 +177,7 @@ running_args = {
 #     "--data_path": "data",
 #     "--gpu": 0,
 #     "--print_freq": 20,
-#     "--fraction": 1.0,
+#     "--fraction": 0.7,
 #     "--workers": 8,
 #     "--optimizer": "Adam",
 #     "--lr": 0.001,
@@ -268,6 +187,7 @@ running_args = {
 #     "--train_batch": 256,
 #     "--selection_batch": 256,
 #     "--test_interval": 1,
+#     # "--selection_epochs": 1,
 #     "--selection_epochs": 12,
 #     "--selection_momentum": 0.0,
 #     "--selection_weight_decay": 0.0,
@@ -289,17 +209,18 @@ if __name__ == '__main__':
         sys.argv.append(str(value))
     print(sys.argv)
     main(wb)
-    # wb.append('备注', 0, "Random, fraction: 1.0, model: ResNet18, dataset: CIFAR100")
-    wb.append('备注', 0, "Random, fraction: 0.01, model: LeNet, dataset: MNIST")
-    # wb.append('备注', 0, "Random, fraction: 0.9, CIFAR10, ResNet18, 随机选择")
-    # wb.append('备注', 0, "0.3,MNIST, LeNet")
-    # wb.append('备注', 0, "fraction: 0.7, THUCNews, TextCNN")
-    # wb.to_excel('./excel/data_70.xlsx')
-    # wb.append('备注', 0, "fraction: 0.7, SST-5, TextCNN")
-    # wb.append('备注', 0, "fraction: 0.5, YELP, TextCNN")
-    # wb.append('备注', 0, "fraction: 1.0, AGNews, TextCNN")
-
-
-    # wb.append('备注', 0, "fraction: 1.0, TinyImagenet, ResNet18")
-    wb.to_excel('./excel/data_010.xlsx')
+    wb.append('备注', 0, "TwoStageSearch, fraction: 0.1, model: LeNet, dataset: MNIST, last_layer, Info, ratio: 1.0, min_mmd_distance: 0.0075, cosine")
+    wb.to_excel('./excel/data_TwoStageSearch_10_2.xlsx')
+    # wb.append('备注', 0, "TwoStageSearch, fraction: 0.1, model: ResNet18, dataset: CIFAR10, TwoStageSearch, last_layer, Info, ratio: 1.0, min_mmd_distance: 0.0075, cosine")
+    # wb.to_excel('./excel/data_TwoStageSearch_10.xlsx')
+    # wb.append('备注', 0, "TwoStageSearch, fraction: 0.1, model: ResNet18, dataset: CIFAR100, TwoStageSearch, last_layer, Confidence, ratio: 1.0, middle: fraction+自动缩放, 随机扰动"
+    #                    )
+    # wb.to_excel('./excel/data_TwoStageSearch_10.xlsx')
+    # wb.append('备注', 0, "TwoStageSearch, fraction: 0.1, model: TextCNN, dataset: SST-5, uniqueness+kcenter(一致的归一化), batch: 256, 比例优化空间, "
+    #                    "0.5:0.5, 特征矩阵:outputs, 置信度：标签索引, iter: 50")
+    # wb.append('备注', 0, "TwoStageSearch, fraction: 0.5, model: TextCNN, dataset: SST-5, ratio: 1.0, middle: 0.75")
+    # wb.append('备注', 0, "TwoStageSearch, fraction: 0.5, model: TextCNN, dataset: YELP, uniqueness+kcenter(一致的归一化), batch: 256, 比例优化空间, "
+    #                    "0.5:0.5, 特征矩阵:outputs, 置信度：标签索引, iter: 50")
+    # wb.append('备注', 0, "TwoStageSearch, fraction: 0.7, model: TextCNN, dataset: AG News, mmd分布微搜索, last_layer")
+    # wb.to_excel('./excel/data_TwoStageSearch_50_2.xlsx')
     print("end")

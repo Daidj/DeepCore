@@ -1,32 +1,34 @@
 import os
 from typing import Any
-import pyarrow.parquet as pq
 
+import gensim
+import pyarrow.parquet as pq
+import nltk
 import pickle
 import torch
 import numpy as np
+from gensim import downloader
 from torch.utils.data import Dataset
+from gensim.models import word2vec
 
-
-class SST2DataSet(Dataset):
+class SST5DataSet(Dataset):
     def __init__(self, root: str, word_2_index: dict, train: bool = True, train_valid_merge=True):
         self.root_dir = root
-        self.train_valid_merge = train_valid_merge
-
         self.train = train
+        self.train_valid_merge = train_valid_merge
         self.data: Any = []
         self.targets = []
-        self.classes = []
+        self.classes = [x for x in range(5)]
         self.dev_data: Any = []
         self.dev_targets = []
         self.word_2_index = word_2_index
-        self.max_len = 52
+        self.max_len = 53
         self.init_dataset()
         self.num_classes = len(self.classes)  # 类别数
 
         self.n_vocab = len(word_2_index)
 
-        print("SST2 Dataset init")
+        print("SST5 Dataset init")
 
     def __getitem__(self, index):
         text, target = self.data[index], self.targets[index]
@@ -61,8 +63,9 @@ class SST2DataSet(Dataset):
 
     def init_dataset(self):
         folder_name = self.root_dir
-        self.classes = [x for x in range(2)]
+
         if self.train:
+
             data_path = os.path.join(folder_name, 'train.parquet')
             self.data, self.targets = self.read_data(data_path)
             dev_data_path = os.path.join(folder_name, 'validation.parquet')
@@ -84,7 +87,7 @@ def build_vocab(file_path):
         sentences_list.extend(chunk.to_pandas().tolist())
     max_length = 0
     for data in sentences_list:
-        words = str(data).split(' ')
+        words = nltk.word_tokenize(str(data))
         if (len(words) > max_length):
             max_length = len(words)
         for word in words:
@@ -93,14 +96,35 @@ def build_vocab(file_path):
     print(max_length)
     return word_2_index
 
+def build_vocab_genism(file_path):
+    # size: 300
+    model = gensim.models.KeyedVectors.load_word2vec_format(file_path, binary=True)
+    print(model['man'])
+    word_2_index = {'UNK': 0, 'PAD': 1}
+    parquet_file = pq.ParquetFile(file_path)
+    table = parquet_file.read()
+    sentences = table.column('text')
+    sentences_list = []
+    for chunk in sentences.chunks:
+        sentences_list.extend(chunk.to_pandas().tolist())
+    max_length = 0
+    for data in sentences_list:
+        words = nltk.word_tokenize(str(data))
+        if (len(words) > max_length):
+            max_length = len(words)
+        for word in words:
+            if word not in word_2_index:
+                word_2_index[word] = len(word_2_index)
+    print(max_length)
+    return word_2_index
 
-def SST2(data_path):
+def SST5(data_path):
     channel = None
     im_size = None
     mean = None
     std = None
-    folder_name = os.path.join(data_path, 'SST-2')
-    vocab_path = os.path.join(folder_name, 'character_vocab.pkl')
+    folder_name = os.path.join(data_path, 'SST-5')
+    vocab_path = os.path.join(folder_name, 'character_vocab_nltk.pkl')
     if os.path.exists(vocab_path):
         # 文件存在,则加载 .pkl 文件
         with open(vocab_path, 'rb') as f:
@@ -110,11 +134,26 @@ def SST2(data_path):
         vocab = build_vocab(os.path.join(folder_name, 'train.parquet'))
         pickle.dump(vocab, open(vocab_path, 'wb'))
 
-    dst_train = SST2DataSet(root=folder_name, word_2_index=vocab, train=True)
+    dst_train = SST5DataSet(root=folder_name, word_2_index=vocab, train=True)
     num_classes = dst_train.num_classes
     class_names = dst_train.classes
-    dst_test = SST2DataSet(root=folder_name, word_2_index=vocab, train=False)
+    dst_test = SST5DataSet(root=folder_name, word_2_index=vocab, train=False)
+    return channel, im_size, num_classes, class_names, mean, std, dst_train, dst_test
+
+def SST5_new(data_path):
+    channel = None
+    im_size = None
+    mean = None
+    std = None
+    folder_name = os.path.join(data_path, 'SST-5')
+    vocab_path = os.path.join(data_path, 'GoogleNews-vectors-negative300.bin')
+    vocab = build_vocab_genism(vocab_path)
+
+    dst_train = SST5DataSet(root=folder_name, word_2_index=vocab, train=True)
+    num_classes = dst_train.num_classes
+    class_names = dst_train.classes
+    dst_test = SST5DataSet(root=folder_name, word_2_index=vocab, train=False)
     return channel, im_size, num_classes, class_names, mean, std, dst_train, dst_test
 
 if __name__ == '__main__':
-    SST2('/home/sample_selection/data')
+    SST5('/home/sample_selection/data')

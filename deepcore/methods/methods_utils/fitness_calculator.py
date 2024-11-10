@@ -1,19 +1,56 @@
+import math
+import random
+
 import torch
 import numpy as np
+from numpy.core.function_base import linspace
+from scipy.stats import gaussian_kde, entropy
+
+from mmd_algorithm import MMD
 
 
 def euclidean_dist(x, y):
     x = x.float()
     y = y.float()
     m, n = x.size(0), y.size(0)
-    xx = torch.pow(x, 2).sum(1, keepdim=True).expand(m, n)
-    yy = torch.pow(y, 2).sum(1, keepdim=True).expand(n, m).t()
-    dist = xx + yy
+    # xx = torch.pow(x, 2).sum(1, keepdim=True).expand(m, n)
+    # yy = torch.pow(y, 2).sum(1, keepdim=True).expand(n, m).t()
+    dist = torch.pow(x, 2).sum(1, keepdim=True).expand(m, n) + torch.pow(y, 2).sum(1, keepdim=True).expand(n, m).t()
     dist.addmm_(x, y.t(), beta=1, alpha=-2)
     # dist.addmm_(1, -2, x, y.t())
     dist = dist.clamp(min=1e-12).sqrt()
     # dist: m * n, dist[i][j] 表示x中的第i个样本和y中的第j个样本的距离
     return dist
+
+
+def cosine_similarity(A, B):
+    # 计算 A 和 B 的 L2 范数
+    norm_A = A.norm(dim=1, keepdim=True)  # (n1, 1)
+    norm_B = B.norm(dim=1, keepdim=True)  # (n2, 1)
+
+    # 计算 A 和 B 的点积
+    similarity_matrix = torch.mm(A, B.t())  # (n1, m) @ (m, n2) -> (n1, n2)
+
+    # 归一化
+    cosine_sim = similarity_matrix / (norm_A * norm_B.t())  # (n1, n2)
+
+    return -cosine_sim
+
+
+def euclidean_dist_for_batch(x, y, batch=2048, metric=euclidean_dist):
+    metric = cosine_similarity
+    # dist: m * n, dist[i][j] 表示x中的第i个样本和y中的第j个样本的距离
+    m, n = x.size(0), y.size(0)
+    distance = torch.empty(m, n, dtype=x.dtype).to(device='cpu')
+    i = 0
+    while True:
+        row_start = i * batch
+        row_end = min((i + 1) * batch, m)
+        distance[row_start:row_end] = metric(x[row_start:row_end], y).cpu()
+        if row_end == m:
+            break
+        i = i + 1
+    return distance
 
 
 def k_center_greedy(matrix, budget: int, metric, device, random_seed=None, index=None, already_selected=None):
@@ -74,7 +111,7 @@ def k_center_greedy(matrix, budget: int, metric, device, random_seed=None, index
 
 
 class RepresentativenessCalculator:
-    def __init__(self, matrix, gene_num, device, metric=euclidean_dist):
+    def __init__(self, matrix, gene_num, device, metric=euclidean_dist_for_batch):
         if type(matrix) == torch.Tensor:
             assert matrix.dim() == 2
         elif type(matrix) == np.ndarray:
@@ -88,7 +125,7 @@ class RepresentativenessCalculator:
         self.distance = distance.cpu()
         self.min_fitness = torch.min(mean_distance) + 1e-6
         self.max_fitness = torch.max(mean_distance) + 1e-6
-        self.samples_fitness = (mean_distance-self.min_fitness)/(self.max_fitness-self.min_fitness)
+        self.samples_fitness = (mean_distance - self.min_fitness) / (self.max_fitness - self.min_fitness)
         self.device = device
 
     def fitness(self, individual):
@@ -116,7 +153,7 @@ class RepresentativenessCalculator:
 
 
 class UniquenessCalculator:
-    def __init__(self, condidence, gene_num, device, metric=euclidean_dist):
+    def __init__(self, condidence, gene_num, device, metric=euclidean_dist_for_batch):
         if type(condidence) == np.ndarray:
             condidence = torch.from_numpy(condidence).requires_grad_(False)
         self.gene_num = gene_num
@@ -128,19 +165,21 @@ class UniquenessCalculator:
     def fitness(self, individual):
         selected = torch.tensor(list(individual.gene))
         fitness = torch.mean(self.confidence[selected])
-        # normalization_fitness = (fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        # normalization_fitness = (fitness - self.min_fitness)/(self.max_fitness - self.min_fitness)
         return fitness.item()
 
     def unselected_fitness(self, individual):
         unselected = torch.tensor(list(individual.unselected_gene))
         scores = self.confidence[unselected]
+        # scores = (scores - scores.min()) / (scores.max() - scores.min())
         return scores
 
     def selected_fitness(self, individual):
         selected = torch.tensor(list(individual.gene))
-        fitness = self.confidence[selected]
+        scores = self.confidence[selected]
+        # scores = (scores - scores.min()) / (scores.max() - scores.min())
         # normalization_fitness = (fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
-        return fitness
+        return scores
 
     def get_best(self):
         _, sorted_indices = torch.sort(self.confidence)
@@ -149,7 +188,7 @@ class UniquenessCalculator:
 
 
 class DensityCalculator:
-    def __init__(self, matrix, gene_num, device, metric=euclidean_dist):
+    def __init__(self, matrix, gene_num, device, metric=euclidean_dist_for_batch):
         if type(matrix) == torch.Tensor:
             assert matrix.dim() == 2
         elif type(matrix) == np.ndarray:
@@ -158,7 +197,8 @@ class DensityCalculator:
         assert callable(metric)
         self.features_matrix = matrix.to(device)
         self.gene_num = gene_num
-        self.distance = metric(self.features_matrix, self.features_matrix).cpu()
+        with torch.no_grad():
+            self.distance = metric(self.features_matrix, self.features_matrix).cpu()
 
         mean_dis = torch.mean(self.distance, dim=1)
         dis, center = mean_dis.min(dim=0)
@@ -174,7 +214,7 @@ class DensityCalculator:
         unselected = torch.tensor(list(individual.unselected_gene))
         dis = self.distance[self.center][selected]
         mean_dis = torch.mean(dis)
-        fitness = torch.abs(self.mean_distance-mean_dis)
+        fitness = torch.abs(self.mean_distance - mean_dis)
         # 值越小说明解越好
         normalization_fitness = (fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
         return normalization_fitness.item()
@@ -211,8 +251,9 @@ class DensityCalculator:
                             device=self.device))
         return set(res_greedy)
 
+
 class DiversityCalculator:
-    def __init__(self, matrix, gene_num, device, metric=euclidean_dist):
+    def __init__(self, matrix, gene_num, device, metric=euclidean_dist_for_batch):
         if type(matrix) == torch.Tensor:
             assert matrix.dim() == 2
         elif type(matrix) == np.ndarray:
@@ -221,8 +262,13 @@ class DiversityCalculator:
         assert callable(metric)
         self.features_matrix = matrix.to(device)
         self.gene_num = gene_num
-        self.distance = metric(self.features_matrix, self.features_matrix).cpu()
-        self.min_fitness = 1e-6
+        # self.distance = metric(self.features_matrix, self.features_matrix).cpu()
+        # torch.cuda.empty_cache()
+
+        self.distance = euclidean_dist_for_batch(self.features_matrix, self.features_matrix).cpu()
+        second_min_values = torch.kthvalue(self.distance, 2, dim=1).values
+
+        self.min_fitness = second_min_values.min().item()+1e-6
         max_dis, _ = torch.max(self.distance, dim=1)
         max_fitness = torch.max(max_dis)
         self.max_fitness = max_fitness.item() + 1e-6
@@ -249,6 +295,80 @@ class DiversityCalculator:
         min_dis, _ = torch.min(dis, dim=1)
         # total_distance = np.sum(min_dis)
         # # 越小说明解越好
+        fitness = torch.max(min_dis) + torch.mean(min_dis)
+        # 值越小说明解越好
+        normalization_fitness = (fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        return normalization_fitness.item()
+
+    def unselected_fitness(self, individual):
+        selected = torch.tensor(list(individual.gene))
+        unselected = torch.tensor(list(individual.unselected_gene))
+        dis = self.distance[unselected, :][:, selected]
+        min_dis, _ = torch.min(dis, dim=1)
+        # scores = 1 - (min_dis - min_dis.min()) / (min_dis.max() - min_dis.min())
+        scores = 1 - (min_dis - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        # scores = scores*0.8+0.1
+
+        return scores
+
+    def selected_fitness(self, individual):
+        selected = torch.tensor(list(individual.gene))
+        dis = self.distance[selected, :][:, selected]
+        second_min_values = torch.kthvalue(dis, 2, dim=1).values
+        # scores = 1 - (second_min_values - second_min_values.min()) / (second_min_values.max() - second_min_values.min())
+
+        scores = 1 - (second_min_values - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        # scores = scores*0.8+0.1
+
+        return scores
+
+    def get_best(self):
+        res_greedy = torch.from_numpy(
+            k_center_greedy(matrix=self.features_matrix, budget=self.gene_num, metric=euclidean_dist,
+                            device=self.device))
+        return set(res_greedy)
+
+
+class DiversityCalculator2:
+    def __init__(self, matrix, gene_num, device, metric=euclidean_dist_for_batch):
+        if type(matrix) == torch.Tensor:
+            assert matrix.dim() == 2
+        elif type(matrix) == np.ndarray:
+            assert matrix.ndim == 2
+            matrix = torch.from_numpy(matrix).requires_grad_(False).to(device)
+        assert callable(metric)
+        self.features_matrix = matrix.to(device)
+        self.gene_num = gene_num
+        self.distance = metric(self.features_matrix, self.features_matrix).cpu()
+        second_min_values = torch.kthvalue(self.distance, 2, dim=1).values
+
+        self.min_fitness = second_min_values.min().item()+1e-6
+        max_dis, _ = torch.max(self.distance, dim=1)
+        max_fitness = torch.max(max_dis)
+        self.max_fitness = max_fitness.item() + 1e-6
+        self.device = device
+
+    def fitness_old(self, individual):
+        selected = torch.tensor(list(individual.gene))
+        unselected = torch.tensor(list(individual.unselected_gene))
+        dis = self.distance[unselected, :][:, selected]
+        # print(dis)
+        min_dis, _ = torch.min(dis, dim=1)
+        # total_distance = np.sum(min_dis)
+        # # 越小说明解越好
+        fitness = torch.max(min_dis)
+        # 值越小说明解越好
+        normalization_fitness = (fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        return normalization_fitness.item()
+
+    def fitness(self, individual):
+        selected = torch.tensor(list(individual.gene))
+        unselected = torch.tensor(list(individual.unselected_gene))
+        dis = self.distance[unselected, :][:, selected]
+        # print(dis)
+        min_dis, _ = torch.min(dis, dim=1)
+        # total_distance = np.sum(min_dis)
+        # # 越小说明解越好
         fitness = torch.mean(min_dis)
         # 值越小说明解越好
         normalization_fitness = (fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
@@ -259,7 +379,9 @@ class DiversityCalculator:
         unselected = torch.tensor(list(individual.unselected_gene))
         dis = self.distance[unselected, :][:, selected]
         min_dis, _ = torch.min(dis, dim=1)
-        scores = 1 - (min_dis - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        scores = 1 - (min_dis - min_dis.min()) / (min_dis.max() - min_dis.min())
+        # scores = 1 - (min_dis - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        # scores = scores*0.8+0.1
 
         return scores
 
@@ -267,12 +389,13 @@ class DiversityCalculator:
         selected = torch.tensor(list(individual.gene))
         dis = self.distance[selected, :][:, selected]
         second_min_values = torch.kthvalue(dis, 2, dim=1).values
+        scores = 1 - (second_min_values - second_min_values.min()) / (second_min_values.max() - second_min_values.min())
 
-        scores = 1 - (second_min_values - self.min_fitness)/(self.max_fitness - self.min_fitness)
+        # scores = 1 - (second_min_values - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        # scores = scores*0.8+0.1
+
         return scores
 
-    def single_local_search(self, individual):
-        pass
 
     def get_best(self):
         res_greedy = torch.from_numpy(
@@ -280,9 +403,8 @@ class DiversityCalculator:
                             device=self.device))
         return set(res_greedy)
 
-
 class UniversalityCalculator:
-    def __init__(self, matrix, gene_num, device, metric=euclidean_dist):
+    def __init__(self, matrix, gene_num, device, metric=euclidean_dist_for_batch):
         if type(matrix) == torch.Tensor:
             assert matrix.dim() == 2
         elif type(matrix) == np.ndarray:
@@ -351,3 +473,179 @@ class UniversalityCalculator:
             k_center_greedy(matrix=self.features_matrix, budget=self.gene_num, metric=euclidean_dist,
                             device=self.device))
         return set(res_greedy)
+
+
+class MMDCalculator:
+    def __init__(self, matrix, gene_num, device, metric=euclidean_dist_for_batch):
+        if type(matrix) == torch.Tensor:
+            assert matrix.dim() == 2
+        elif type(matrix) == np.ndarray:
+            assert matrix.ndim == 2
+            matrix = torch.from_numpy(matrix).requires_grad_(False).to(device)
+        assert callable(metric)
+        self.features_matrix = matrix.to(device)
+        self.gene_num = gene_num
+        self.calculator = MMD(matrix, device)
+        # self.distance = metric(self.features_matrix, self.features_matrix).cpu()
+        self.min_fitness = 1e-6
+        max_dis, _ = torch.max(self.calculator.distance, dim=1)
+        max_index = torch.argmax(max_dis).cpu().item()
+        max_fitness = self.calculator.mmd_for_data_set(torch.tensor([max_index]))
+        self.max_fitness = max_fitness + 1e-6
+        self.device = device
+
+    def fitness(self, individual):
+        selected = torch.tensor(list(individual.gene))
+        fitness = self.calculator.mmd_for_data_set(selected)
+        normalization_fitness = (fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        return normalization_fitness
+
+    def unselected_fitness(self, individual):
+        scores = self.calculator.get_unselected_scores(individual.gene, individual.unselected_gene)
+        scores = (scores - scores.min()) / (scores.max() - scores.min())
+        return scores
+
+    def selected_fitness(self, individual):
+        scores = self.calculator.get_selected_scores(individual.gene, individual.unselected_gene)
+        # selected = torch.tensor(list(individual.gene))
+        # dis = self.calculator.distance[selected, :][:, selected]
+        # second_min_values = torch.kthvalue(dis, 2, dim=1).values.cpu()
+        #
+        # scores = 1 - (second_min_values - second_min_values.min()) / (second_min_values.max() - second_min_values.min())
+        scores = (scores - scores.min()) / (scores.max() - scores.min())
+        return scores
+
+    def selected_fitness_old(self, individual):
+        selected = torch.tensor(list(individual.gene))
+        dis = self.calculator.distance[selected, :][:, selected]
+        second_min_values = torch.kthvalue(dis, 2, dim=1).values.cpu()
+
+        scores = 1 - (second_min_values - second_min_values.min()) / (second_min_values.max() - second_min_values.min())
+        return scores
+
+    def single_local_search(self, individual):
+        pass
+
+    def get_best(self):
+        return set(self.calculator.get_min_distance_index(self.gene_num))
+
+
+class KLCalculator:
+    def __init__(self, confidence, gene_num, device, metric=euclidean_dist_for_batch):
+        if type(confidence) == np.ndarray:
+            confidence = torch.from_numpy(confidence).requires_grad_(False)
+        self.gene_num = gene_num
+        self.total_gene_num = len(confidence)
+        # print('total gene num: ', self.total_gene_num)
+        self.confidence = confidence
+        self.origin_pdf = gaussian_kde(confidence)
+        self.min_confidence = min(confidence)
+        self.max_confidence = max(confidence)
+        self.lin = linspace(self.min_confidence, self.max_confidence, 200)
+        self.origin_distribution = self.origin_pdf.pdf(self.lin)
+        self.probability = torch.tensor(self.origin_pdf.pdf(self.confidence))
+
+        # self.min_fitness = torch.min(self.confidence) + 1e-6
+        # self.max_fitness = torch.max(self.confidence) + 1e-6
+        # self.confidence = (self.confidence - self.min_fitness) / (self.max_fitness - self.min_fitness)
+
+    def crossover_nearby(self, gene: int, unselected_genes: set):
+        prob = self.probability[gene]
+        unselected_genes_prob = self.probability[list(unselected_genes)]
+        scores = torch.abs(unselected_genes_prob-prob)
+        return list(unselected_genes)[torch.argmin(scores)]
+
+    def distribution_divergence(self, p, q):
+        # M = (p + q) / 2
+        # js = 0.5 * entropy(p, M) + 0.5 * entropy(q, M)
+        kl = entropy(p, q)
+        return kl
+
+    def fitness(self, individual):
+        selected = torch.tensor(list(individual.gene))
+        pdf = gaussian_kde(self.confidence[selected])
+        distribution = pdf.pdf(self.lin)
+        fitness = self.distribution_divergence(self.origin_distribution, distribution)
+        # normalization_fitness = (fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        return min(fitness.item(), 0.9999)
+
+    def unselected_fitness(self, individual):
+        selected = torch.tensor(list(individual.gene))
+        unselected = torch.tensor(list(individual.unselected_gene))
+        if len(selected) == 1:
+            return torch.rand(len(unselected))
+        pdf = gaussian_kde(self.confidence[selected])
+        origin_probability = self.probability[unselected]
+        current_probability = torch.tensor(pdf.pdf(self.confidence[unselected]))
+        scores = current_probability - origin_probability
+        scores = (scores - torch.min(scores)) / (torch.max(scores) - torch.min(scores))
+        # scores = scores*0.8+0.1
+        # scores = (scores*0.75+0.05).mul(self.confidence[unselected])
+        return scores
+
+    def selected_fitness(self, individual):
+        selected = torch.tensor(list(individual.gene))
+        unselected = torch.tensor(list(individual.unselected_gene))
+        pdf = gaussian_kde(self.confidence[selected])
+        origin_probability = self.probability[selected]
+        current_probability = torch.tensor(pdf.pdf(self.confidence[selected]))
+        scores = current_probability - origin_probability
+        scores = (scores - torch.min(scores)) / (torch.max(scores) - torch.min(scores))
+        # scores = scores*0.8+0.1
+        # scores = (scores*0.75+0.05).mul(self.confidence[selected])
+        return scores
+
+    def get_best(self):
+        selected = set(random.sample(range(self.total_gene_num), self.gene_num))
+        return selected
+
+    def get_best_old(self):
+        total_size = self.total_gene_num
+        iter = 20
+        step = round(total_size / iter)
+        step_selected = math.floor(self.gene_num/iter)
+        selected = set()
+        start = 0
+        _, sorted_indices = torch.sort(self.confidence)
+        sorted_index = sorted_indices.numpy()
+        for i in range(iter):
+            end = start + step
+            if i == iter - 1:
+                step_selected = self.gene_num - len(selected)
+                end = total_size
+            selected_index = np.random.choice(sorted_index[start:end], size=step_selected, replace=False)
+            selected.update(set(selected_index))
+            start = end
+        return selected
+
+class SizeCalculator:
+    def __init__(self, total_num, gene_num, device, metric=euclidean_dist_for_batch):
+        self.total_num = total_num
+        self.gene_num = gene_num
+        self.min_fitness = torch.min(self.confidence) + 1e-6
+        self.max_fitness = torch.max(self.confidence) + 1e-6
+        self.confidence = (self.confidence - self.min_fitness) / (self.max_fitness - self.min_fitness)
+
+    def fitness(self, individual):
+        selected = torch.tensor(list(individual.gene))
+        fitness = torch.mean(self.confidence[selected])
+        # normalization_fitness = (fitness - self.min_fitness)/(self.max_fitness - self.min_fitness)
+        return fitness.item()
+
+    def unselected_fitness(self, individual):
+        unselected = torch.tensor(list(individual.unselected_gene))
+        scores = self.confidence[unselected]
+        # scores = (scores - scores.min()) / (scores.max() - scores.min())
+        return scores
+
+    def selected_fitness(self, individual):
+        selected = torch.tensor(list(individual.gene))
+        scores = self.confidence[selected]
+        # scores = (scores - scores.min()) / (scores.max() - scores.min())
+        # normalization_fitness = (fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        return scores
+
+    def get_best(self):
+        _, sorted_indices = torch.sort(self.confidence)
+        res_importance = sorted_indices[:self.gene_num]
+        return set(res_importance)

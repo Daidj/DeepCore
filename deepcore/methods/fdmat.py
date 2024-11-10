@@ -35,6 +35,8 @@ class fdmat(EarlyTrain):
         self.dst_val = dst_val
 
         self.balance = balance
+        self.approximate = False
+        self.lmda = 4
 
     def while_update(self, outputs, loss, targets, epoch, batch_idx, batch_size):
         if batch_idx % self.args.print_freq == 0:
@@ -47,8 +49,8 @@ class fdmat(EarlyTrain):
 
 
     # load data
-    def _load_data(self, save_features):
-        data = save_features
+    def _load_data(self, data):
+
         labels = [np.full(shape=len(data[key]), fill_value=key) for key in data]
         indexs = [features[0] for key in data for features in data[key]]
         data_arr = [features[1] for key in data for features in data[key]]
@@ -62,57 +64,83 @@ class fdmat(EarlyTrain):
     def define_data(self, val): 
         self.model.embedding_recorder.record_embedding = True
         self.model.eval()
+        matrix = []
+        each_class = []
+        for c in range(self.args.num_classes):
+            class_index = np.arange(self.n_train)[self.dst_train.targets == c]
+            each_class.append(class_index)
+
         train_batch_loader = torch.utils.data.DataLoader(self.dst_train, batch_size=self.args.selection_batch,
                                                              num_workers=self.args.workers)
-        save_features = []
-        save_labels = []
         with torch.no_grad():
-            output_dict = collections.defaultdict(list)
-            j = 0
             # loading train samples
             for i, (inputs, labels) in enumerate(train_batch_loader):
                 inputs = inputs.to(self.args.device)
                 labels = labels.to(self.args.device)
                 outputs = self.model(inputs)
-                # getting the feature embedding of the last layer 
-                if self.args.approximate:
-                    outputs = outputs.cpu().data.numpy()
-                    for out, label in zip(outputs, labels):
-                        indx_feature = [j, out]
-                        j += 1
-                        output_dict[label.item()].append(indx_feature)
+                # getting the feature embedding of the last layer
+                if self.approximate:
+                    outputs = outputs.cpu()
+                    matrix.append(outputs)
                 else:
                     outputs = self.model.embedding_recorder.embedding
-                    outputs = outputs.cpu().data.numpy()
-                    for out, label in zip(outputs, labels):
-                        indx_feature = [j, out]
-                        save_features.append(out)
-                        save_labels.append(int(label.item()))
-                        j += 1
-                        output_dict[label.item()].append(indx_feature)
+                    outputs = outputs.cpu()
+                    matrix.append(outputs)
+
+        # save_features = []
+        # save_labels = []
+        # with torch.no_grad():
+        #     output_dict = collections.defaultdict(list)
+        #     j = 0
+        #     # loading train samples
+        #     for i, (inputs, labels) in enumerate(train_batch_loader):
+        #         inputs = inputs.to(self.args.device)
+        #         labels = labels.to(self.args.device)
+        #         outputs = self.model(inputs)
+        #         # getting the feature embedding of the last layer
+        #         if self.approximate:
+        #             outputs = outputs.cpu().data.numpy()
+        #             for out, label in zip(outputs, labels):
+        #                 indx_feature = [j, out]
+        #                 j += 1
+        #                 output_dict[label.item()].append(indx_feature)
+        #         else:
+        #             outputs = self.model.embedding_recorder.embedding
+        #             outputs = outputs.cpu().data.numpy()
+        #             for out, label in zip(outputs, labels):
+        #                 indx_feature = [j, out]
+        #                 save_features.append(out)
+        #                 save_labels.append(int(label.item()))
+        #                 j += 1
+        #                 output_dict[label.item()].append(indx_feature)
         self.model.train()
         self.model.embedding_recorder.record_embedding = False
 
         # getting data index labels
-        dataset = self._load_data(output_dict)
-        labels = dataset["labels"].clone()
-
-        each_sample = []
-        each_class = []
-        while labels.shape[0] > 0:
-            indices = torch.where(dataset["labels"] == labels[0])[0]
-            each_sample.append(dataset["data"][indices,:])
-            each_class.append(indices)
-            indices = torch.where(labels != labels[0])[0]
-            labels = labels[indices]
-        return each_sample, each_class
+        # dataset = self._load_data(output_dict)
+        # labels = dataset["labels"].clone()
+        # indexes = dataset["index"]
+        #
+        # each_sample = []
+        # each_class = []
+        # while labels.shape[0] > 0:
+        #     indices = torch.where(dataset["labels"] == labels[0])[0]
+        #     each_sample.append(dataset["data"][indices,:])
+        #     each_class.append(indices)
+        #     indices = torch.where(labels != labels[0])[0]
+        #     labels = labels[indices]
+        matrix = torch.cat(matrix, dim=0)
+        each_samples = []
+        for index in each_class:
+            each_samples.append(matrix[index])
+        return each_samples, each_class
     
     def proccess_data(self): # 
         new_data, all_data_index = self.define_data(val=False)  
 
         # Power transform
         for i in range(len(new_data)):
-            beta = 0.5
+            beta = 1
             new_data[i] = torch.pow(new_data[i]+1e-6, beta)
         
         # CenterDatas
@@ -146,20 +174,20 @@ class fdmat(EarlyTrain):
         # select the coreset by uisng optimal transport
         r = torch.ones(n_runs, n_usamples) 
         c = torch.ones(n_runs, num_class) * torch.tensor(class_indices)
-        p_xj_test, all_sum = compute_optimal_transport(dist[:, :], r, c, epsilon=1e-6, lam=self.args.lmda)
+        p_xj_test, all_sum = compute_optimal_transport(dist[:, :], r, c, epsilon=1e-6, lam=self.lmda)
         result = all_sum.norm(dim=2).pow(2)[0]
-        return result
+        # result = result.cpu().numpy()
+        return result, all_data_index
 
     def finish_run(self):  # get the pre-trained model by training a few epoches and select coreset
         self.model.embedding_recorder.record_embedding = True  # recording embedding vector
         self.model.eval()
-        b, all_index= self.define_data(val=False)
+        # b, all_index= self.define_data(val=False)
         print("********* start selection *********")
-        result = self.proccess_data()
+        result, all_index = self.proccess_data()
         return result, all_index
     def select(self, **kwargs):
-        self.run()
-        result,  all_index = self.finish_run()
+        result,  all_index = self.run()
         self.train_indx = np.arange(self.n_train)
         if not self.balance:
             top_examples = np.array([], dtype=np.int64)
@@ -171,8 +199,10 @@ class fdmat(EarlyTrain):
             for c in range(self.num_classes):
                 c_indx = torch.tensor(all_index[c])
                 budget = round(self.fraction * len(c_indx))
-                result = tensor(result, dtype=long)
+                result = tensor(result)
+                print(result)
                 index_save = (torch.argsort(result[c_indx]).cpu().numpy())[:budget]
                 index_save = c_indx[index_save]
                 top_examples = np.append(top_examples, index_save)
+        print("top: ", top_examples)
         return {"indices": top_examples, "scores": result}

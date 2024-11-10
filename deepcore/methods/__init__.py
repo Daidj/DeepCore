@@ -18,10 +18,17 @@ from .random import *
 from .NotDiff import *
 from .uncertainty_new import *
 from .mmd import *
-from .uncertaintyMMD import *
+from .uncertaintyDistribution import *
 from .uncertaintyKL import *
 from .uncertainty_denoise import *
 from .uncertainty_kcenter_denoise import *
 from .heuristic import *
 from .moea_d_ldea import *
+from .representativeness import *
+from .fdmat import *
+from .single_objective_optimization import *
+from .kcenter_uncertainty import *
+from .micro import *
+from .micro_search import *
+from .two_stage_search import *
 

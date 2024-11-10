@@ -83,7 +83,7 @@ def main(wb=None):
     parser.add_argument('--submodular', default="GraphCut", help="specifiy submodular function to use")
     parser.add_argument('--submodular_greedy', default="LazyGreedy",
                         help="specifiy greedy algorithm for submodular optimization")
-    parser.add_argument('--uncertainty', default="Entropy", help="specifiy uncertanty score to use")
+    parser.add_argument('--uncertainty', default="LeastConfidence", help="specifiy uncertanty score to use")
 
     # Checkpoint and resumption
     parser.add_argument('--save_path', "-sp", type=str, default='', help='path to save results (default: do not save)')

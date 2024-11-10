@@ -76,6 +76,6 @@ class Forgetting(EarlyTrain):
                 budget = round(self.fraction * len(c_indx))
                 top_examples = np.append(top_examples,
                                     c_indx[np.argsort(self.forgetting_events[c_indx].cpu().numpy())[::-1][:budget]])
-        print("forget: ")
-        print(self.forgetting_events[c_indx].cpu().numpy().shape)
+
+
         return {"indices": top_examples, "scores": self.forgetting_events}

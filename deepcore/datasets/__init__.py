@@ -9,3 +9,6 @@ from .tinyimagenet import *
 from .medical import *
 from .thucnews import *
 from .sst2 import *
+from .sst5 import *
+from .yelp import *
+from .agnews import *
