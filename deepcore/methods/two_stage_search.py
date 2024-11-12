@@ -85,62 +85,63 @@ def two_stage_search(matrix, confidence, budget: int, metric, device, random_see
 
     step = max(1, round(len(second_stage_search)*0.01))
     last = None
-    for i in range(20):
-        selected_tensor = torch.tensor(list(selected))
-        unselected_tensor = torch.tensor(list(unselected))
-        unselected_dis = distance[unselected_tensor, :][:, selected_tensor]
-        selected_dis = distance[selected_tensor, :][:, selected_tensor]
-        selected_min_dis = torch.kthvalue(selected_dis, 2, dim=1).values
-        selected_bak_dis = torch.kthvalue(selected_dis, 3, dim=1).values
+    if len(second_stage_search) != 0:
+        for i in range(20):
+            selected_tensor = torch.tensor(list(selected))
+            unselected_tensor = torch.tensor(list(unselected))
+            unselected_dis = distance[unselected_tensor, :][:, selected_tensor]
+            selected_dis = distance[selected_tensor, :][:, selected_tensor]
+            selected_min_dis = torch.kthvalue(selected_dis, 2, dim=1).values
+            selected_bak_dis = torch.kthvalue(selected_dis, 3, dim=1).values
 
-        result_tensor = torch.where(selected_dis != selected_min_dis, torch.tensor(0.0),
-                                    selected_bak_dis - selected_dis)
-        other_dis = torch.sum(result_tensor, dim=1)
-        redundancy_info = (selected_min_dis - other_dis)
-        uncertainty = confidence[selected_tensor]
+            result_tensor = torch.where(selected_dis != selected_min_dis, torch.tensor(0.0),
+                                        selected_bak_dis - selected_dis)
+            other_dis = torch.sum(result_tensor, dim=1)
+            redundancy_info = (selected_min_dis - other_dis)
+            uncertainty = confidence[selected_tensor]
 
-        scores = uncertainty - similarity_redundancy_ratio * redundancy_info
-        current_score = torch.sum(scores).item()
-        if current_score == last:
-            break
-        else:
-            last = current_score
+            scores = uncertainty - similarity_redundancy_ratio * redundancy_info
+            current_score = torch.sum(scores).item()
+            if current_score == last:
+                break
+            else:
+                last = current_score
 
-        sorted_tensor, sorted_indices = torch.sort(scores, descending=True)
-        l = list(selected)
-        remove = set()
-        cur = 0
-        while len(remove) < step:
-            if l[sorted_indices[cur]] in second_stage_search:
-                remove.add(l[sorted_indices[cur]])
-            cur += 1
-        selected.difference_update(remove)
-        second_stage_search.difference_update(remove)
-        unselected.update(remove)
+            sorted_tensor, sorted_indices = torch.sort(scores, descending=True)
+            l = list(selected)
+            remove = set()
+            cur = 0
+            while len(remove) < step:
+                if l[sorted_indices[cur]] in second_stage_search:
+                    remove.add(l[sorted_indices[cur]])
+                cur += 1
+            selected.difference_update(remove)
+            second_stage_search.difference_update(remove)
+            unselected.update(remove)
 
-        selected_tensor = torch.tensor(list(selected))
-        unselected_tensor = torch.tensor(list(unselected))
-        unselected_dis = distance[unselected_tensor, :][:, selected_tensor]
-        selected_dis = distance[selected_tensor, :][:, selected_tensor]
-        selected_min_dis = torch.kthvalue(selected_dis, 2, dim=1).values
-        result_tensor = -torch.where(unselected_dis > selected_min_dis, torch.tensor(0.0), unselected_dis - selected_min_dis)
-        self_min_dis, _ = torch.min(unselected_dis, dim=1)
+            selected_tensor = torch.tensor(list(selected))
+            unselected_tensor = torch.tensor(list(unselected))
+            unselected_dis = distance[unselected_tensor, :][:, selected_tensor]
+            selected_dis = distance[selected_tensor, :][:, selected_tensor]
+            selected_min_dis = torch.kthvalue(selected_dis, 2, dim=1).values
+            result_tensor = -torch.where(unselected_dis > selected_min_dis, torch.tensor(0.0), unselected_dis - selected_min_dis)
+            self_min_dis, _ = torch.min(unselected_dis, dim=1)
 
-        other_dis = torch.sum(result_tensor, dim=1)
-        redundancy_info = self_min_dis-other_dis
-        # redundancy_info = (self_min_dis-other_dis)/mean_distance
-        uncertainty = confidence[unselected_tensor]
+            other_dis = torch.sum(result_tensor, dim=1)
+            redundancy_info = self_min_dis-other_dis
+            # redundancy_info = (self_min_dis-other_dis)/mean_distance
+            uncertainty = confidence[unselected_tensor]
 
-        scores = uncertainty-similarity_redundancy_ratio*redundancy_info
-        _, indices = torch.topk(scores, k=step, largest=False)
-        l = list(unselected)
-        new_elements = set([l[i] for i in indices])
-        selected.update(new_elements)
-        second_stage_search.update(new_elements)
-        unselected.difference_update(selected)
+            scores = uncertainty-similarity_redundancy_ratio*redundancy_info
+            _, indices = torch.topk(scores, k=step, largest=False)
+            l = list(unselected)
+            new_elements = set([l[i] for i in indices])
+            selected.update(new_elements)
+            second_stage_search.update(new_elements)
+            unselected.difference_update(selected)
 
-        step = max(1, math.floor(0.99*step))
-        print('score: {}'.format(last))
+            step = max(1, math.floor(0.99*step))
+            print('score: {}'.format(last))
 
 
     assert len(selected) == budget
