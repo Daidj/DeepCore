@@ -85,7 +85,7 @@ def two_stage_search(matrix, confidence, budget: int, metric, device, random_see
 
     step = max(1, round(len(second_stage_search)*0.01))
     last = None
-    if len(second_stage_search) != 0:
+    if len(second_stage_search) > step:
         for i in range(20):
             selected_tensor = torch.tensor(list(selected))
             unselected_tensor = torch.tensor(list(unselected))
@@ -485,4 +485,4 @@ class TwoStageSearch(EarlyTrain):
             #                                    random_seed=self.random_seed,
             #                                    already_selected=self.already_selected, print_freq=self.args.print_freq)
 
-        return {"indices": selection_result, "mmd_distance": mmd_search_num}
+        return {"indices": selection_result, "mmd_distance": mmd_search_total}
