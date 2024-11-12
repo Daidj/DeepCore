@@ -4,12 +4,151 @@ import random
 from .earlytrain import EarlyTrain
 import torch
 import numpy as np
-from .methods_utils import euclidean_dist, euclidean_dist_for_batch, MMD
+from .methods_utils import euclidean_dist, euclidean_dist_for_batch, MMD, micro_search
 from ..nets.nets_utils import MyDataParallel
 
-
-
 def two_stage_search(matrix, confidence, budget: int, metric, device, random_seed=None, index=None, already_selected=None,
+                    print_freq: int = 20):
+    if type(matrix) == torch.Tensor:
+        assert matrix.dim() == 2
+        matrix = matrix.to(device)
+    elif type(matrix) == np.ndarray:
+        assert matrix.ndim == 2
+        matrix = torch.from_numpy(matrix).requires_grad_(False).to(device)
+    if type(confidence) == np.ndarray:
+        confidence = torch.from_numpy(confidence).requires_grad_(False).to(device)
+    sample_num = matrix.shape[0]
+    assert sample_num >= 1
+
+    if budget < 0:
+        raise ValueError("Illegal budget size.")
+    elif budget > sample_num:
+        budget = sample_num
+    init_num = budget
+    if index is not None:
+        assert matrix.shape[0] == len(index)
+    else:
+        index = np.arange(sample_num)
+
+    assert callable(metric)
+    fraction = budget/sample_num
+    selected = set()
+    unselected = set(torch.arange(sample_num).numpy())
+    distance = euclidean_dist_for_batch(matrix, matrix)
+    confidence = confidence.cpu()
+    confidence = (confidence - confidence.min() + 1e-3) / (confidence.max() - confidence.min())
+    middle = (1-fraction)/2
+    confidence = torch.abs(confidence-middle)/(0.5+0.5*fraction)
+
+    # confidence = torch.abs(confidence-(1-fraction))/max(fraction, (1-fraction))
+    similarity_redundancy_ratio = 1.0
+
+
+    stage_budget = min(round(0.01*sample_num), budget)
+    step = max(1, round(stage_budget * 0.1))
+
+    subset, mmd_search_num = micro_search.first_stage_search(matrix, init_num)
+    init_num -= mmd_search_num
+    selected.update(subset)
+    unselected.difference_update(subset)
+
+    print('mmd search end: {}/{}({})'.format(len(selected), sample_num, len(selected)/sample_num))
+    print('uncertainty serach: {}/{}({})'.format(init_num, sample_num, init_num/sample_num))
+
+    second_stage_search = set()
+    while init_num > 0:
+
+        selected_num = min(init_num, step)
+
+        selected_tensor = torch.tensor(list(selected))
+        unselected_tensor = torch.tensor(list(unselected))
+        unselected_dis = distance[unselected_tensor, :][:, selected_tensor]
+        selected_dis = distance[selected_tensor, :][:, selected_tensor]
+        selected_min_dis = torch.kthvalue(selected_dis, 2, dim=1).values
+        result_tensor = -torch.where(unselected_dis > selected_min_dis, torch.tensor(0.0), unselected_dis - selected_min_dis)
+        self_min_dis, _ = torch.min(unselected_dis, dim=1)
+
+        other_dis = torch.sum(result_tensor, dim=1)
+        redundancy_info = self_min_dis-other_dis
+        # redundancy_info = (self_min_dis-other_dis)/mean_distance
+        uncertainty = confidence[unselected_tensor]
+
+        scores = uncertainty-similarity_redundancy_ratio*redundancy_info
+        _, indices = torch.topk(scores, k=selected_num, largest=False)
+        l = list(unselected)
+        new_elements = set([l[i] for i in indices])
+        selected.update(new_elements)
+        second_stage_search.update(new_elements)
+        unselected.difference_update(selected)
+        init_num -= selected_num
+        step = max(1, math.floor(0.99*step))
+
+    step = max(1, round(len(second_stage_search)*0.01))
+    last = None
+    for i in range(20):
+        selected_tensor = torch.tensor(list(selected))
+        unselected_tensor = torch.tensor(list(unselected))
+        unselected_dis = distance[unselected_tensor, :][:, selected_tensor]
+        selected_dis = distance[selected_tensor, :][:, selected_tensor]
+        selected_min_dis = torch.kthvalue(selected_dis, 2, dim=1).values
+        selected_bak_dis = torch.kthvalue(selected_dis, 3, dim=1).values
+
+        result_tensor = torch.where(selected_dis != selected_min_dis, torch.tensor(0.0),
+                                    selected_bak_dis - selected_dis)
+        other_dis = torch.sum(result_tensor, dim=1)
+        redundancy_info = (selected_min_dis - other_dis)
+        uncertainty = confidence[selected_tensor]
+
+        scores = uncertainty - similarity_redundancy_ratio * redundancy_info
+        current_score = torch.sum(scores).item()
+        if current_score == last:
+            break
+        else:
+            last = current_score
+
+        sorted_tensor, sorted_indices = torch.sort(scores, descending=True)
+        l = list(selected)
+        remove = set()
+        cur = 0
+        while len(remove) < step:
+            if l[sorted_indices[cur]] in second_stage_search:
+                remove.add(l[sorted_indices[cur]])
+            cur += 1
+        selected.difference_update(remove)
+        second_stage_search.difference_update(remove)
+        unselected.update(remove)
+
+        selected_tensor = torch.tensor(list(selected))
+        unselected_tensor = torch.tensor(list(unselected))
+        unselected_dis = distance[unselected_tensor, :][:, selected_tensor]
+        selected_dis = distance[selected_tensor, :][:, selected_tensor]
+        selected_min_dis = torch.kthvalue(selected_dis, 2, dim=1).values
+        result_tensor = -torch.where(unselected_dis > selected_min_dis, torch.tensor(0.0), unselected_dis - selected_min_dis)
+        self_min_dis, _ = torch.min(unselected_dis, dim=1)
+
+        other_dis = torch.sum(result_tensor, dim=1)
+        redundancy_info = self_min_dis-other_dis
+        # redundancy_info = (self_min_dis-other_dis)/mean_distance
+        uncertainty = confidence[unselected_tensor]
+
+        scores = uncertainty-similarity_redundancy_ratio*redundancy_info
+        _, indices = torch.topk(scores, k=step, largest=False)
+        l = list(unselected)
+        new_elements = set([l[i] for i in indices])
+        selected.update(new_elements)
+        second_stage_search.update(new_elements)
+        unselected.difference_update(selected)
+
+        step = max(1, math.floor(0.99*step))
+        print('score: {}'.format(last))
+
+
+    assert len(selected) == budget
+    return index[list(selected)], mmd_search_num
+
+
+
+def two_stage_search_old(matrix, confidence, budget: int, metric, device, random_seed=None, index=None, already_selected=None,
                     print_freq: int = 20):
     if type(matrix) == torch.Tensor:
         assert matrix.dim() == 2
@@ -40,7 +179,10 @@ def two_stage_search(matrix, confidence, budget: int, metric, device, random_see
     # mean_distance = torch.mean(distance)
     confidence = confidence.cpu()
     confidence = (confidence - confidence.min() + 1e-3) / (confidence.max() - confidence.min())
-    confidence = torch.abs(confidence-(1-fraction))/max(fraction, (1-fraction))
+    middle = (1-fraction)/2
+    confidence = torch.abs(confidence-middle)/(0.5+0.5*fraction)
+
+    # confidence = torch.abs(confidence-(1-fraction))/max(fraction, (1-fraction))
     similarity_redundancy_ratio = 1.0
 
 
@@ -49,7 +191,7 @@ def two_stage_search(matrix, confidence, budget: int, metric, device, random_see
 
     # second_stage_budget = max(0, budget-first_stage_budget)
     calculator = MMD(matrix, 'cuda')
-    min_mmd_distance = 0.0075
+    min_mmd_distance = 0.005
     mmd_distance = 1.0
     while init_num > 0:
         if mmd_distance < min_mmd_distance:
@@ -85,8 +227,9 @@ def two_stage_search(matrix, confidence, budget: int, metric, device, random_see
             current_stage_budget -= selected_num
             init_num -= selected_num
         mmd_distance = calculator.mmd_for_data_set(torch.tensor(list(selected)))
-    print('mmd search end: {}/{}'.format(len(selected), budget))
-    print('uncertainty serach: {}'.format(init_num/sample_num))
+    print('mmd search end: {}/{}({})'.format(len(selected), sample_num, len(selected)/sample_num))
+    print('uncertainty serach: {}/{}({})'.format(init_num, sample_num, init_num/sample_num))
+    mmd_search_num = len(selected)
 
     while init_num > 0:
 
@@ -197,7 +340,7 @@ def two_stage_search(matrix, confidence, budget: int, metric, device, random_see
     # print("score: ", best_score)
     # print(history_scores)
 
-    return index[list(selected)]
+    return index[list(selected)], mmd_search_num
 
 
 class TwoStageSearch(EarlyTrain):
@@ -309,7 +452,7 @@ class TwoStageSearch(EarlyTrain):
                         budget_list[i] = class_num[i]
                         balance = False
 
-
+            mmd_search_total = 0
             for c in range(self.args.num_classes):
                 class_index = class_index_list[c]
                 features_matrix = features_matrix_list[c]
@@ -318,7 +461,7 @@ class TwoStageSearch(EarlyTrain):
                 # budget = round(budget_list[c])
                 print('balance')
                 budget = round(self.fraction*len(class_index))
-                selection_result = np.append(selection_result, two_stage_search(features_matrix, confidence,
+                subset, mmd_search_num = two_stage_search(features_matrix, confidence,
                                                                                budget=budget,
                                                                                metric=self.metric,
                                                                                device=self.args.device,
@@ -327,7 +470,9 @@ class TwoStageSearch(EarlyTrain):
                                                                                already_selected=self.already_selected[
                                                                                    np.in1d(self.already_selected,
                                                                                            class_index)],
-                                                                               print_freq=self.args.print_freq))
+                                                                               print_freq=self.args.print_freq)
+                selection_result = np.append(selection_result, subset)
+                mmd_search_total += mmd_search_num
                 features_matrix_list[c] = None
         else:
             pass
@@ -339,4 +484,4 @@ class TwoStageSearch(EarlyTrain):
             #                                    random_seed=self.random_seed,
             #                                    already_selected=self.already_selected, print_freq=self.args.print_freq)
 
-        return {"indices": selection_result}
+        return {"indices": selection_result, "mmd_distance": mmd_search_num}
