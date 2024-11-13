@@ -59,27 +59,32 @@ def two_stage_search(matrix, confidence, budget: int, metric, device, random_see
     while init_num > 0:
 
         selected_num = min(init_num, step)
+        if len(selected) == 0:
+            # selected_num = max(5, selected_num)
+            selected = set(random.sample(list(unselected), selected_num))
+            second_stage_search.update(selected)
+            unselected.difference_update(selected)
+        else:
+            selected_tensor = torch.tensor(list(selected))
+            unselected_tensor = torch.tensor(list(unselected))
+            unselected_dis = distance[unselected_tensor, :][:, selected_tensor]
+            selected_dis = distance[selected_tensor, :][:, selected_tensor]
+            selected_min_dis = torch.kthvalue(selected_dis, 2, dim=1).values
+            result_tensor = -torch.where(unselected_dis > selected_min_dis, torch.tensor(0.0), unselected_dis - selected_min_dis)
+            self_min_dis, _ = torch.min(unselected_dis, dim=1)
 
-        selected_tensor = torch.tensor(list(selected))
-        unselected_tensor = torch.tensor(list(unselected))
-        unselected_dis = distance[unselected_tensor, :][:, selected_tensor]
-        selected_dis = distance[selected_tensor, :][:, selected_tensor]
-        selected_min_dis = torch.kthvalue(selected_dis, 2, dim=1).values
-        result_tensor = -torch.where(unselected_dis > selected_min_dis, torch.tensor(0.0), unselected_dis - selected_min_dis)
-        self_min_dis, _ = torch.min(unselected_dis, dim=1)
+            other_dis = torch.sum(result_tensor, dim=1)
+            redundancy_info = self_min_dis-other_dis
+            # redundancy_info = (self_min_dis-other_dis)/mean_distance
+            uncertainty = confidence[unselected_tensor]
 
-        other_dis = torch.sum(result_tensor, dim=1)
-        redundancy_info = self_min_dis-other_dis
-        # redundancy_info = (self_min_dis-other_dis)/mean_distance
-        uncertainty = confidence[unselected_tensor]
-
-        scores = uncertainty-similarity_redundancy_ratio*redundancy_info
-        _, indices = torch.topk(scores, k=selected_num, largest=False)
-        l = list(unselected)
-        new_elements = set([l[i] for i in indices])
-        selected.update(new_elements)
-        second_stage_search.update(new_elements)
-        unselected.difference_update(selected)
+            scores = uncertainty-similarity_redundancy_ratio*redundancy_info
+            _, indices = torch.topk(scores, k=selected_num, largest=False)
+            l = list(unselected)
+            new_elements = set([l[i] for i in indices])
+            selected.update(new_elements)
+            second_stage_search.update(new_elements)
+            unselected.difference_update(selected)
         init_num -= selected_num
         step = max(1, math.floor(0.99*step))
 
