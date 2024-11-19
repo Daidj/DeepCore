@@ -8,15 +8,15 @@ from random_remove_exp import test_model
 #     "--dataset": "MNIST",
 #     "--model": "LeNet",
 #     "--selection": "kCenterGreedy",
-#     "--num_exp": 5,
-#     # "--num_exp": 2,
+#     # "--num_exp": 5,
+#     "--num_exp": 3,
 #     "--num_eval": 1,
 #     # "--epochs": 20,
 #     "--epochs": 200,
 #     "--data_path": "data",
 #     "--gpu": 0,
 #     "--print_freq": 20,
-#     "--fraction": 0.7,
+#     "--fraction": 0.01,
 #     "--workers": 8,
 #     "--optimizer": "Adam",
 #     "--lr": 0.002,
@@ -145,7 +145,7 @@ running_args = {
     "--data_path": "data",
     "--gpu": 0,
     "--print_freq": 20,
-    "--fraction": 0.7,
+    "--fraction": 0.5,
     "--workers": 8,
     "--optimizer": "Adam",
     "--lr": 0.001,
@@ -177,13 +177,13 @@ if __name__ == '__main__':
         sys.argv.append(str(value))
     print(sys.argv)
     main(wb)
-    # wb.append('备注', 0, "kCenterGreedy, fraction: 0.7, model: LeNet, dataset: MNIST")
-    # wb.to_excel('./excel/data_kCenterGreedy_70.xlsx')
+    # wb.append('备注', 0, "kCenterGreedy, fraction: 0.01, model: LeNet, dataset: MNIST")
+    # wb.to_excel('./excel/data_kCenterGreedy_01.xlsx')
     # wb.append('备注', 0, "kCenterGreedy, fraction: 0.9, model: ResNet18, dataset: CIFAR100, batch:256, worker:4, last_layer")
     # wb.append('备注', 0, "kCenterGreedy, fraction: 0.3 model: ResNet18, dataset: CIFAR10, worker:4, batch: 256, "
     #                    "使用last_layer作为特征矩阵")
     # wb.append('备注', 0, "kCenterGreedy, fraction: 0.9, model: TextCNN, dataset: SST5, batch:256, worker:8, last_layer")
-    wb.append('备注', 0, "kCenterGreedy, fraction: 0.7, model: TextCNN, dataset: AGNews, batch:256, worker:8, last_layer")
+    wb.append('备注', 0, "kCenterGreedy, fraction: 0.5, model: TextCNN, dataset: AGNews, batch:256, worker:8, last_layer")
 
-    wb.to_excel('./excel/data_kCenterGreedy_70.xlsx')
+    wb.to_excel('./excel/data_kCenterGreedy_50.xlsx')
     print("end")

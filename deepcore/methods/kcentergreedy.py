@@ -45,9 +45,9 @@ def k_center_greedy(matrix, budget: int, metric, device, random_seed=None, index
 
         # Initialize a (num_of_already_selected+budget-1)*sample_num matrix storing distances of pool points from
         # each clustering center.
-        dis_matrix = -1 * torch.ones([num_of_already_selected + budget - 1, sample_num], requires_grad=False).to(device)
+        dis_matrix = -1 * torch.ones([num_of_already_selected + budget - 1, sample_num], requires_grad=False)
 
-        dis_matrix[:num_of_already_selected, ~select_result] = metric(matrix[select_result], matrix[~select_result]).to(device)
+        dis_matrix[:num_of_already_selected, ~select_result] = metric(matrix[select_result], matrix[~select_result])
 
         mins = torch.min(dis_matrix[:num_of_already_selected, :], dim=0).values
 

@@ -29,7 +29,7 @@ def first_stage_search(matrix, budget: int, metric=None, device='cuda'):
 
     # second_stage_budget = max(0, budget-first_stage_budget)
     calculator = MMD(matrix, 'cuda')
-    min_mmd_distance = 0.01
+    min_mmd_distance = 0.002
     mmd_distance = 1.0
     while init_num > 0:
         if mmd_distance < min_mmd_distance:

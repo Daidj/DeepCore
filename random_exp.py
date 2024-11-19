@@ -9,7 +9,7 @@ running_args = {
     "--model": "LeNet",
     "--selection": "Random",
     # "--num_exp": 5,
-    "--num_exp": 1,
+    "--num_exp": 3,
     "--num_eval": 1,
     # "--epochs": 2,
     "--epochs": 200,

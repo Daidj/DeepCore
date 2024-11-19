@@ -48,7 +48,7 @@ running_args = {
     "--data_path": "data",
     "--gpu": 0,
     "--print_freq": 20,
-    "--fraction": 0.7,
+    "--fraction": 0.5,
     "--workers": 4,
     "--optimizer": "Adam",
     "--lr": 0.002,
@@ -82,6 +82,6 @@ if __name__ == '__main__':
     print(sys.argv)
     main(wb)
 
-    wb.append('备注', 0, "craig, fraction: 0.7, model: ResNet18, dataset: CIFAR10")
-    wb.to_excel('./excel/data_craig_70.xlsx')
+    wb.append('备注', 0, "craig, fraction: 0.5, model: ResNet18, dataset: CIFAR10")
+    wb.to_excel('./excel/data_craig_50.xlsx')
     print("end")
