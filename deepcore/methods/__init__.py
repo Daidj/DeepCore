@@ -33,4 +33,5 @@ from .micro_search import *
 from .two_stage_search import *
 from .micro_glister import *
 from .self_adaptation_search import *
+from .moea_d_ldea_new import *
 

@@ -19,10 +19,10 @@ class WorkBook(object):
             '算法时间': ['' for i in range(row_num)],
             'MMD时间': ['' for i in range(row_num)],
             'MMD距离': ['' for i in range(row_num)],
-            '备注': ['' for i in range(row_num)]
+            '备注': ['' for i in range(row_num)],
         }
-        # for i in range(1, column_num):
-        #     self.write_data[first_row[i]] = ['' for j in range(row_num)]
+        for i in range(5):
+            self.write_data['solution_{}'.format(i)] = ['' for i in range(row_num)]
     def to_excel(self, path='./data.xlsx'):
         # os.remove(path)
         df = pds.DataFrame(self.write_data)

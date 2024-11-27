@@ -6,51 +6,8 @@ import numpy as np
 from numpy.core.function_base import linspace
 from scipy.stats import gaussian_kde, entropy
 
+from deepcore.methods.methods_utils import euclidean_dist_for_batch, euclidean_dist
 from mmd_algorithm import MMD
-
-
-def euclidean_dist(x, y):
-    x = x.float()
-    y = y.float()
-    m, n = x.size(0), y.size(0)
-    # xx = torch.pow(x, 2).sum(1, keepdim=True).expand(m, n)
-    # yy = torch.pow(y, 2).sum(1, keepdim=True).expand(n, m).t()
-    dist = torch.pow(x, 2).sum(1, keepdim=True).expand(m, n) + torch.pow(y, 2).sum(1, keepdim=True).expand(n, m).t()
-    dist.addmm_(x, y.t(), beta=1, alpha=-2)
-    # dist.addmm_(1, -2, x, y.t())
-    dist = dist.clamp(min=1e-12).sqrt()
-    # dist: m * n, dist[i][j] 表示x中的第i个样本和y中的第j个样本的距离
-    return dist
-
-
-def cosine_similarity(A, B):
-    # 计算 A 和 B 的 L2 范数
-    norm_A = A.norm(dim=1, keepdim=True)  # (n1, 1)
-    norm_B = B.norm(dim=1, keepdim=True)  # (n2, 1)
-
-    # 计算 A 和 B 的点积
-    similarity_matrix = torch.mm(A, B.t())  # (n1, m) @ (m, n2) -> (n1, n2)
-
-    # 归一化
-    cosine_sim = similarity_matrix / (norm_A * norm_B.t())  # (n1, n2)
-
-    return -cosine_sim
-
-
-def euclidean_dist_for_batch(x, y, batch=2048, metric=euclidean_dist):
-    metric = cosine_similarity
-    # dist: m * n, dist[i][j] 表示x中的第i个样本和y中的第j个样本的距离
-    m, n = x.size(0), y.size(0)
-    distance = torch.empty(m, n, dtype=x.dtype).to(device='cpu')
-    i = 0
-    while True:
-        row_start = i * batch
-        row_end = min((i + 1) * batch, m)
-        distance[row_start:row_end] = metric(x[row_start:row_end], y).cpu()
-        if row_end == m:
-            break
-        i = i + 1
-    return distance
 
 
 def k_center_greedy(matrix, budget: int, metric, device, random_seed=None, index=None, already_selected=None):
@@ -488,10 +445,10 @@ class MMDCalculator:
         self.calculator = MMD(matrix, device)
         # self.distance = metric(self.features_matrix, self.features_matrix).cpu()
         self.min_fitness = 1e-6
-        max_dis, _ = torch.max(self.calculator.distance, dim=1)
-        max_index = torch.argmax(max_dis).cpu().item()
-        max_fitness = self.calculator.mmd_for_data_set(torch.tensor([max_index]))
-        self.max_fitness = max_fitness + 1e-6
+        # max_dis, _ = torch.max(self.calculator.distance, dim=1)
+        # max_index = torch.argmax(max_dis).cpu().item()
+        max_fitness = self.calculator.mmd_for_data_set(torch.tensor([0]))
+        self.max_fitness = 1.0
         self.device = device
 
     def fitness(self, individual):
@@ -515,19 +472,8 @@ class MMDCalculator:
         scores = (scores - scores.min()) / (scores.max() - scores.min())
         return scores
 
-    def selected_fitness_old(self, individual):
-        selected = torch.tensor(list(individual.gene))
-        dis = self.calculator.distance[selected, :][:, selected]
-        second_min_values = torch.kthvalue(dis, 2, dim=1).values.cpu()
-
-        scores = 1 - (second_min_values - second_min_values.min()) / (second_min_values.max() - second_min_values.min())
-        return scores
-
-    def single_local_search(self, individual):
-        pass
-
     def get_best(self):
-        return set(self.calculator.get_min_distance_index(self.gene_num))
+        return set(self.calculator.get_min_distance_index(self.gene_num, step_rate=0.12))
 
 
 class KLCalculator:
@@ -649,3 +595,100 @@ class SizeCalculator:
         _, sorted_indices = torch.sort(self.confidence)
         res_importance = sorted_indices[:self.gene_num]
         return set(res_importance)
+
+class InfoCalculator:
+    def __init__(self, matrix, confidence, gene_num, device, metric=euclidean_dist_for_batch):
+        if type(matrix) == torch.Tensor:
+            assert matrix.dim() == 2
+        elif type(matrix) == np.ndarray:
+            assert matrix.ndim == 2
+            matrix = torch.from_numpy(matrix).requires_grad_(False).to(device)
+        assert callable(metric)
+        if type(confidence) == np.ndarray:
+            confidence = torch.from_numpy(confidence).requires_grad_(False)
+        self.gene_num = gene_num
+        self.confidence = confidence
+
+        self.confidence = (self.confidence - torch.min(self.confidence)) / (torch.max(self.confidence) - torch.min(self.confidence))
+
+        self.features_matrix = matrix.to(device)
+        self.distance = metric(self.features_matrix, self.features_matrix).cpu()
+        # torch.cuda.empty_cache()
+
+        self.similarity_redundancy_ratio = 1.0
+        # second_min_values = torch.kthvalue(self.distance, 2, dim=1).values
+
+        self.min_fitness = 0.0 - self.similarity_redundancy_ratio*1.0*gene_num
+        # max_dis, _ = torch.max(self.distance, dim=1)
+        # max_fitness = torch.max(max_dis)
+        self.max_fitness = gene_num
+
+        self.device = device
+
+    def fitness(self, individual):
+
+        selected_tensor = torch.tensor(list(individual.gene))
+        unselected_tensor = torch.tensor(list(individual.unselected_gene))
+        selected_dis = self.distance[selected_tensor, :][:, selected_tensor]
+        selected_min_dis = torch.kthvalue(selected_dis, 2, dim=1).values
+        selected_bak_dis = torch.kthvalue(selected_dis, 3, dim=1).values
+
+        result_tensor = torch.where(selected_dis != selected_min_dis, torch.tensor(0.0),
+                                    selected_bak_dis - selected_dis)
+        other_dis = torch.sum(result_tensor, dim=1)
+        redundancy_info = (selected_min_dis - other_dis)
+        uncertainty = self.confidence[selected_tensor]
+
+        scores = uncertainty - self.similarity_redundancy_ratio * redundancy_info
+        fitness = torch.sum(scores).item()
+        # 值越小说明解越好
+        normalization_fitness = (fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        return normalization_fitness
+
+    def unselected_fitness(self, individual):
+        selected_tensor = torch.tensor(list(individual.gene))
+        unselected_tensor = torch.tensor(list(individual.unselected_gene))
+
+        unselected_dis = self.distance[unselected_tensor, :][:, selected_tensor]
+        selected_dis = self.distance[selected_tensor, :][:, selected_tensor]
+        selected_min_dis = torch.kthvalue(selected_dis, 2, dim=1).values
+        result_tensor = -torch.where(unselected_dis > selected_min_dis, torch.tensor(0.0),
+                                     unselected_dis - selected_min_dis)
+        self_min_dis, _ = torch.min(unselected_dis, dim=1)
+
+        other_dis = torch.sum(result_tensor, dim=1)
+        redundancy_info = self_min_dis - other_dis
+        uncertainty = self.confidence[unselected_tensor]
+
+        score = uncertainty - self.similarity_redundancy_ratio * redundancy_info
+        score = (score - score.min()) / (score.max() - score.min())
+
+        return score
+
+    def selected_fitness(self, individual):
+        selected_tensor = torch.tensor(list(individual.gene))
+        unselected_tensor = torch.tensor(list(individual.unselected_gene))
+        unselected_dis = self.distance[unselected_tensor, :][:, selected_tensor]
+        selected_dis = self.distance[selected_tensor, :][:, selected_tensor]
+        selected_min_dis = torch.kthvalue(selected_dis, 2, dim=1).values
+        selected_bak_dis = torch.kthvalue(selected_dis, 3, dim=1).values
+
+        result_tensor = torch.where(selected_dis != selected_min_dis, torch.tensor(0.0),
+                                    selected_bak_dis - selected_dis)
+        other_dis = torch.sum(result_tensor, dim=1)
+        redundancy_info = (selected_min_dis - other_dis)
+        uncertainty = self.confidence[selected_tensor]
+
+        score = uncertainty - self.similarity_redundancy_ratio * redundancy_info
+        score = (score - score.min()) / (score.max() - score.min())
+
+        # scores = 1 - (second_min_values - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        # scores = scores*0.8+0.1
+
+        return score
+
+    def get_best(self):
+        res_greedy = torch.from_numpy(
+            k_center_greedy(matrix=self.features_matrix, budget=self.gene_num, metric=euclidean_dist,
+                            device=self.device))
+        return set(res_greedy)

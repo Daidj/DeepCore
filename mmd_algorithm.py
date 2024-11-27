@@ -1,4 +1,5 @@
 import itertools
+import math
 import random
 import time
 from torchvision.datasets import MNIST
@@ -7,34 +8,36 @@ from torch.utils.data import DataLoader
 import torch
 import numpy as np
 
-def euclidean_dist(x, y):
-    x = x.float()
-    y = y.float()
-    m, n = x.size(0), y.size(0)
-    xx = torch.pow(x, 2).sum(1, keepdim=True).expand(m, n)
-    yy = torch.pow(y, 2).sum(1, keepdim=True).expand(n, m).t()
-    dist = xx + yy
-    dist.addmm_(x, y.t(), beta=1, alpha=-2)
-    # dist.addmm_(1, -2, x, y.t())
-    dist = dist.clamp(min=1e-12).sqrt()
-    # dist: m * n, dist[i][j] 表示x中的第i个样本和y中的第j个样本的距离
-    return dist
+# def euclidean_dist(x, y):
+#     x = x.float()
+#     y = y.float()
+#     m, n = x.size(0), y.size(0)
+#     xx = torch.pow(x, 2).sum(1, keepdim=True).expand(m, n)
+#     yy = torch.pow(y, 2).sum(1, keepdim=True).expand(n, m).t()
+#     dist = xx + yy
+#     dist.addmm_(x, y.t(), beta=1, alpha=-2)
+#     # dist.addmm_(1, -2, x, y.t())
+#     dist = dist.clamp(min=1e-12).sqrt()
+#     # dist: m * n, dist[i][j] 表示x中的第i个样本和y中的第j个样本的距离
+#     return dist
+#
+# def euclidean_dist_for_batch(x, y, batch=2048, metric=euclidean_dist):
+#
+#     # dist: m * n, dist[i][j] 表示x中的第i个样本和y中的第j个样本的距离
+#     m, n = x.size(0), y.size(0)
+#     distance = torch.empty(m, n, dtype=x.dtype).to(device='cpu')
+#     i = 0
+#     while True:
+#         row_start = i * batch
+#         row_end = min((i + 1) * batch, m)
+#         distance[row_start:row_end] = metric(x[row_start:row_end], y).cpu()
+#         if row_end == m:
+#             break
+#         i = i + 1
+#     # print(distance)
+#     return distance
+from deepcore.methods.methods_utils import euclidean_dist_for_batch, euclidean_dist
 
-def euclidean_dist_for_batch(x, y, batch=2048, metric=euclidean_dist):
-
-    # dist: m * n, dist[i][j] 表示x中的第i个样本和y中的第j个样本的距离
-    m, n = x.size(0), y.size(0)
-    distance = torch.empty(m, n, dtype=x.dtype).to(device='cpu')
-    i = 0
-    while True:
-        row_start = i * batch
-        row_end = min((i + 1) * batch, m)
-        distance[row_start:row_end] = metric(x[row_start:row_end], y).cpu()
-        if row_end == m:
-            break
-        i = i + 1
-    # print(distance)
-    return distance
 
 class MMD:
     def __init__(self, matrix, device='cuda'):
@@ -71,24 +74,43 @@ class MMD:
             unselected.remove(selected)
         return list(result)
 
-    def get_min_distance_index(self, selected_size):
+    def get_min_distance_index(self, selected_size, step_rate=None):
 
-        result = set()
+        selected = set()
         unselected = set(range(self.dataset_size))
-        for loop in range(selected_size):
-            if len(result) == 0:
-                selected = random.choice(list(unselected))
-            else:
-                # selected_tensor = torch.tensor(list(result))
-                # unselected_tensor = torch.tensor(list(unselected))
-                # distance = self.distance[unselected_tensor, :]
-                # selected_distance = self.distance[unselected_tensor][:, selected_tensor]
-                # print(selected_distance.shape)
-                samples_scores = self.get_unselected_scores(result, unselected)
-                selected = list(unselected)[torch.argmin(samples_scores).cpu().item()]
-            result.add(selected)
-            unselected.remove(selected)
-        return list(result)
+        if step_rate is None:
+            for loop in range(selected_size):
+                if len(selected) == 0:
+                    element = random.choice(list(unselected))
+                else:
+                    # selected_tensor = torch.tensor(list(result))
+                    # unselected_tensor = torch.tensor(list(unselected))
+                    # distance = self.distance[unselected_tensor, :]
+                    # selected_distance = self.distance[unselected_tensor][:, selected_tensor]
+                    # print(selected_distance.shape)
+                    samples_scores = self.get_unselected_scores(selected, unselected)
+                    element = list(unselected)[torch.argmin(samples_scores).cpu().item()]
+                selected.add(element)
+                unselected.remove(element)
+        else:
+            step = max(1, round(step_rate*selected_size))
+            while selected_size > 0:
+                selected_num = min(selected_size, step)
+                selected_num = max(1, selected_num)
+                if len(selected) == 0:
+                    # selected_num = max(5, selected_num)
+                    selected = set(random.sample(list(unselected), selected_num))
+                    unselected.difference_update(selected)
+                else:
+                    mmd_scores = self.get_unselected_scores(selected, unselected)
+                    _, indices = torch.topk(mmd_scores, k=selected_num, largest=False)
+                    l = list(unselected)
+                    new_elements = set([l[i] for i in indices])
+                    selected.update(new_elements)
+                    unselected.difference_update(selected)
+                selected_size -= selected_num
+                step = math.floor(step * 0.9)
+        return list(selected)
 
     def get_unselected_scores(self, selected, unselected):
         selected_tensor = torch.tensor(list(selected))
