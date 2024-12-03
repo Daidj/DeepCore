@@ -369,8 +369,9 @@ class MODE2:
     def get_best_in_solution(self, fraction=None):
         # 比例优化空间
         if fraction is None:
-            first = random.random()
-            fraction = torch.tensor([first, 1-first])
+            step = 1.0 / (self.solution_num - 1)
+            first = random.randint(0, self.solution_num-1)
+            fraction = torch.tensor([first*step, 1.0-first*step])
         else:
             fraction = torch.tensor(fraction)
         fitness_front = [p.fitness for p in self.best_solution]
@@ -448,7 +449,11 @@ class MODE2:
                 new_population_subproblems = [selected_subproblem if i % 2 == 0 else neighboring for i in
                                               range(len(new_population))]
                 if opr % 5 == 0:
-                    new_population.append(self.best_solution[self.last_best_index].local_search(
+                    # new_population.append(self.best_solution[self.last_best_index].local_search(
+                    #     self.subproblems.weight_vectors[self.best_solution_to_subproblem[self.last_best_index]]))
+                    # new_population_subproblems.append(self.best_solution_to_subproblem[self.last_best_index])
+                    last_best = random.choice(self.get_multi_best_solution())
+                    new_population.append(last_best.local_search(
                         self.subproblems.weight_vectors[self.best_solution_to_subproblem[self.last_best_index]]))
                     new_population_subproblems.append(self.best_solution_to_subproblem[self.last_best_index])
                 single_objective_1 = np.array(
