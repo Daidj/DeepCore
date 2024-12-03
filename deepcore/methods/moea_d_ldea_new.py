@@ -35,7 +35,7 @@ def plot_nested_list(nested_list, diff=None, important_points=None, title='X-Y',
         max_y = max(max_y, max(diff_y))
         plt.scatter(diff_x, diff_y, s=5, c='r')
         for i, j in zip(diff_x, diff_y):
-            plt.annotate(f'({i:.4f},{j:.4f})', (i, j), color='red')
+            plt.annotate(f'({i:.5f},{j:.5f})', (i, j), color='red')
 
     if important_points != None:
         important_x = [point[0] for point in important_points]
@@ -46,7 +46,7 @@ def plot_nested_list(nested_list, diff=None, important_points=None, title='X-Y',
         max_y = max(max_y, max(important_y))
         plt.scatter(important_x, important_y, s=5, c='g')
         for i, j in zip(important_x, important_y):
-            plt.annotate(f'({i:.4f},{j:.4f})', (i, j), color='green')
+            plt.annotate(f'({i:.5f},{j:.5f})', (i, j), color='green')
 
     plt.xlim(min_x - 0.2 * (max_x - min_x), max_x + 0.2 * (max_x - min_x))
     plt.ylim(min_y - 0.2 * (max_y - min_y), max_y + 0.2 * (max_y - min_y))
@@ -115,6 +115,7 @@ class Individual:
 
     def local_search(self, weight_vector):
         print(self.fitness, " local search: ", weight_vector)
+        self.step_rate = self.step_rate * 0.9
         search_num = max(1, round(self.step_rate * self.gene_num))
         child = self.clone()
         child.__remove_worst(weight_vector, search_num)
@@ -126,7 +127,6 @@ class Individual:
             print("search worse")
         else:
             print("search equal")
-        self.step_rate = self.step_rate*0.9
         return child
 
     def local_search_random(self, weight_vector):
@@ -248,7 +248,7 @@ class Individual:
         return dot_product.item()
 
     def set_fitness(self):
-        self.fitness = [round(calculator.fitness(self), 5) for calculator in self.fitness_calculators]
+        self.fitness = [round(calculator.fitness(self), 6) for calculator in self.fitness_calculators]
     # def compare_individual(individual_1, individual_2):
     #     if all(a <= b for a, b in zip(individual_1, individual_2)):
     #         return -1
