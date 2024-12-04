@@ -449,13 +449,13 @@ class MODE2:
                 new_population_subproblems = [selected_subproblem if i % 2 == 0 else neighboring for i in
                                               range(len(new_population))]
                 if opr % 5 == 0:
-                    # new_population.append(self.best_solution[self.last_best_index].local_search(
-                    #     self.subproblems.weight_vectors[self.best_solution_to_subproblem[self.last_best_index]]))
-                    # new_population_subproblems.append(self.best_solution_to_subproblem[self.last_best_index])
-                    last_best = random.choice(self.get_multi_best_solution())
-                    new_population.append(last_best.local_search(
+                    new_population.append(self.best_solution[self.last_best_index].local_search(
                         self.subproblems.weight_vectors[self.best_solution_to_subproblem[self.last_best_index]]))
                     new_population_subproblems.append(self.best_solution_to_subproblem[self.last_best_index])
+                    # last_best = random.choice(self.get_multi_best_solution())
+                    # new_population.append(last_best.local_search(
+                    #     self.subproblems.weight_vectors[self.best_solution_to_subproblem[self.last_best_index]]))
+                    # new_population_subproblems.append(self.best_solution_to_subproblem[self.last_best_index])
                 single_objective_1 = np.array(
                     [p.get_single_fitness(self.subproblems.weight_vectors[selected_subproblem]) for p in
                      new_population])
@@ -622,15 +622,19 @@ class MOEA2(EarlyTrain):
                     selection_results[i] = np.append(selection_results[i], best_result)
 
                 os.makedirs(test_data_folder, exist_ok=True)
-                best_file_path = os.path.join(test_data_folder, 'best_multi_{}.npy'.format(self.args.dataset))
-                np.save(best_file_path, selection_results)
+                best_file_path = os.path.join(test_data_folder, 'best_{}_multi_{}.npy'.format(self.fraction, self.args.dataset))
+                np.save(best_file_path, np.array(best_list))
                 torch.save(features_matrix,
-                           os.path.join(test_data_folder, 'features_matrix_{}.pth'.format(self.args.dataset)))
-                torch.save(confidence, os.path.join(test_data_folder, 'importance_{}.pth'.format(self.args.dataset)))
+                           os.path.join(test_data_folder, 'features_matrix_{}_{}.pth'.format(self.fraction, self.args.dataset)))
+                torch.save(confidence, os.path.join(test_data_folder, 'importance_{}_{}.pth'.format(self.fraction, self.args.dataset)))
         else:
             selection_results = None
             # scores = self.rank_uncertainty()
             # selection_result = np.argsort(scores)[:self.coreset_size]
+        test_data_folder = 'test_data/multi_{}'.format(self.args.dataset)
+        os.makedirs(test_data_folder, exist_ok=True)
+        best_file_path = os.path.join(test_data_folder, 'best_multi_{}.npy'.format(self.fraction))
+        np.save(best_file_path, selection_results)
 
         return [{'indices': result} for result in selection_results]
 
