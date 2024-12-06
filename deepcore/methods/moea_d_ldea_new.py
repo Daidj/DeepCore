@@ -208,7 +208,7 @@ class Individual:
             init_num = self.gene_num - sample_num
         current_rate = 1.0
         while init_num > 0:
-            step = min(init_num, round(self.gene_num * self.step_rate * current_rate))
+            step = min(init_num, round(self.total_gene_num * 0.001))
             step = max(1, step)
             self.__greedy_search(weight_vector, step)
             init_num -= step
