@@ -6,7 +6,7 @@ import numpy as np
 from mmd_algorithm import MMD
 
 
-def first_stage_search(matrix, budget: int, metric=None, device='cuda'):
+def first_stage_search(matrix, budget: int, metric=None, device='cuda', search=True):
     if type(matrix) == torch.Tensor:
         assert matrix.dim() == 2
         matrix = matrix.to(device)
@@ -29,7 +29,7 @@ def first_stage_search(matrix, budget: int, metric=None, device='cuda'):
 
     # second_stage_budget = max(0, budget-first_stage_budget)
     calculator = MMD(matrix, 'cuda')
-    min_mmd_distance = 0.002
+    min_mmd_distance = 0.003
     mmd_distance = 1.0
     while init_num > 0:
         if mmd_distance < min_mmd_distance:
@@ -64,28 +64,29 @@ def first_stage_search(matrix, budget: int, metric=None, device='cuda'):
                 unselected.difference_update(selected)
             current_stage_budget -= selected_num
             init_num -= selected_num
-        have_remove = set()
-        for i in range(20):
-            search_step = 1
-            mmd_scores = calculator.get_selected_scores(selected, unselected)
-            _, indices = torch.topk(mmd_scores, k=search_step)
-            l = list(selected)
-            remove = set([l[i] for i in indices])
-            if remove.issubset(have_remove):
-                print('early stop')
-                break
-            have_remove.update(remove)
-            selected.difference_update(remove)
-            unselected.update(remove)
+        if search:
+            have_remove = set()
+            for i in range(20):
+                search_step = 1
+                mmd_scores = calculator.get_selected_scores(selected, unselected)
+                _, indices = torch.topk(mmd_scores, k=search_step)
+                l = list(selected)
+                remove = set([l[i] for i in indices])
+                if remove.issubset(have_remove):
+                    print('early stop')
+                    break
+                have_remove.update(remove)
+                selected.difference_update(remove)
+                unselected.update(remove)
 
-            mmd_scores = calculator.get_unselected_scores(selected, unselected)
-            _, indices = torch.topk(mmd_scores, k=search_step, largest=False)
-            l = list(unselected)
-            new_elements = set([l[i] for i in indices])
-            selected.update(new_elements)
-            unselected.difference_update(selected)
-            # mmd_distance = calculator.mmd_for_data_set(torch.tensor(list(selected)))
-            # print(mmd_distance)
+                mmd_scores = calculator.get_unselected_scores(selected, unselected)
+                _, indices = torch.topk(mmd_scores, k=search_step, largest=False)
+                l = list(unselected)
+                new_elements = set([l[i] for i in indices])
+                selected.update(new_elements)
+                unselected.difference_update(selected)
+                # mmd_distance = calculator.mmd_for_data_set(torch.tensor(list(selected)))
+                # print(mmd_distance)
         mmd_distance = calculator.mmd_for_data_set(torch.tensor(list(selected)))
     print('mmd search end: {}/{}({})'.format(len(selected), sample_num, len(selected)/sample_num))
     print('uncertainty serach: {}/{}({})'.format(init_num, sample_num, init_num/sample_num))

@@ -5,7 +5,7 @@ import torch
 import numpy as np
 from numpy.core.function_base import linspace
 from scipy.stats import gaussian_kde, entropy
-
+from deepcore.methods.methods_utils.micro_search import first_stage_search
 from deepcore.methods.methods_utils import euclidean_dist_for_batch, euclidean_dist
 from mmd_algorithm import MMD
 
@@ -622,11 +622,13 @@ class InfoCalculator:
         # max_dis, _ = torch.max(self.distance, dim=1)
         # max_fitness = torch.max(max_dis)
         self.max_fitness = gene_num
-
+        _, min_num = first_stage_search(matrix=matrix, budget=gene_num, search=False)
+        self.min_num = min_num
         self.device = device
 
     def fitness(self, individual):
-
+        if self.gene_num <= self.min_num:
+            return 0.0
         selected_tensor = torch.tensor(list(individual.gene))
         unselected_tensor = torch.tensor(list(individual.unselected_gene))
         selected_dis = self.distance[selected_tensor, :][:, selected_tensor]
@@ -646,6 +648,8 @@ class InfoCalculator:
         return normalization_fitness
 
     def unselected_fitness(self, individual):
+        if self.gene_num <= self.min_num:
+            return torch.zeros(len(individual.unselected_gene))
         selected_tensor = torch.tensor(list(individual.gene))
         unselected_tensor = torch.tensor(list(individual.unselected_gene))
 
@@ -666,6 +670,8 @@ class InfoCalculator:
         return score
 
     def selected_fitness(self, individual):
+        if self.gene_num <= self.min_num:
+            return torch.zeros(len(individual.gene))
         selected_tensor = torch.tensor(list(individual.gene))
         unselected_tensor = torch.tensor(list(individual.unselected_gene))
         unselected_dis = self.distance[unselected_tensor, :][:, selected_tensor]

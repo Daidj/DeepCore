@@ -168,7 +168,7 @@ class Individual:
 
     def __greedy_search(self, weight_vector, num):
 
-        if len(self.gene) == 0:
+        if len(self.gene) <= 5:
             selected = set(random.sample(list(self.unselected_gene), num))
             self.gene.update(selected)
             self.unselected_gene.difference_update(selected)
@@ -379,7 +379,7 @@ class MODE2:
         greedy_best = torch.tensor(self.greedy_best_fitness_points)
         best_point = torch.min(front_tensor, dim=0).values
         worst_point = torch.max(front_tensor, dim=0).values
-        scores = (front_tensor - best_point) / (worst_point - best_point)
+        scores = (front_tensor - best_point) / (worst_point - best_point+1e-8)
 
         fraction_matrix = fraction.unsqueeze(0).repeat(scores.size(0), 1)
         scores = torch.sum(scores * fraction_matrix, dim=1)
