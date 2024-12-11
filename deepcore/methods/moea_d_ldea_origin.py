@@ -311,7 +311,7 @@ class SubProblems:
         # print(self.regions)
 
 
-class MODE2:
+class MOEADAlgorithm:
     def __init__(self, fitness_calculators: list, total_gene_num: int, budget: int, device, population_num=20,
                  output_folder='test_data', solution_num=5, step_rate=0.01):
         self.population_num = population_num
@@ -330,10 +330,10 @@ class MODE2:
         for i in range(population_num):
             individual = Individual(total_gene_num=self.total_gene_num, gene_num=self.gene_num,
                                     target_num=self.target_num, step_rate=self.step_rate)
-            # individual.random_init()
+            individual.random_init()
             # print('random: ', individual.fitness)
             # if i % 10 == 0:
-            individual.greedy_init(self.subproblems.weight_vectors[i])
+            # individual.greedy_init(self.subproblems.weight_vectors[i])
             # else:
             #     individual.greedy_init(self.subproblems.weight_vectors[i], 0.9 - (i % 10) / 20)
             self.best_population_for_subproblems.append(individual)
@@ -358,12 +358,13 @@ class MODE2:
                 self.best_solution_to_subproblem.append(i)
         self.last_best_index = int(len(self.best_solution) / 2)
         self.device = device
-        self.greedy_best = []
-        for calculator in fitness_calculators:
-            i = Individual(self.total_gene_num, self.gene_num, self.target_num)
-            i.init(calculator.get_best())
-            self.greedy_best.append(i)
-        self.greedy_best_fitness_points = [p.fitness for p in self.greedy_best]
+        # self.greedy_best = []
+        # for calculator in fitness_calculators:
+        #     i = Individual(self.total_gene_num, self.gene_num, self.target_num)
+        #     i.init(calculator.get_best())
+        #     self.greedy_best.append(i)
+        # self.greedy_best_fitness_points = [p.fitness for p in self.greedy_best]
+        self.greedy_best_fitness_points = None
         self.output_folder = output_folder
 
     def get_best_in_solution(self, fraction=None):
@@ -376,7 +377,7 @@ class MODE2:
             fraction = torch.tensor(fraction)
         fitness_front = [p.fitness for p in self.best_solution]
         front_tensor = torch.tensor(fitness_front)
-        greedy_best = torch.tensor(self.greedy_best_fitness_points)
+        # greedy_best = torch.tensor(self.greedy_best_fitness_points)
         best_point = torch.min(front_tensor, dim=0).values
         worst_point = torch.max(front_tensor, dim=0).values
         scores = (front_tensor - best_point) / (worst_point - best_point+1e-8)
@@ -413,7 +414,7 @@ class MODE2:
         L = 10
         utility = np.ones((self.population_num, L))
 
-        beta = min(self.target_num / 5, 0.8)
+        beta = min(self.target_num / 10, 0.4)
         for i in range(iter):
             print("Iter:", i)
             utility[:, i % L] = 1
@@ -448,10 +449,10 @@ class MODE2:
                 new_population = [parent_1, parent_2, child_1, child_2, child_3, child_4]
                 new_population_subproblems = [selected_subproblem if i % 2 == 0 else neighboring for i in
                                               range(len(new_population))]
-                if opr % 5 == 0:
-                    new_population.append(self.best_solution[self.last_best_index].local_search(
-                        self.subproblems.weight_vectors[self.best_solution_to_subproblem[self.last_best_index]]))
-                    new_population_subproblems.append(self.best_solution_to_subproblem[self.last_best_index])
+                # if opr % 5 == 0:
+                #     new_population.append(self.best_solution[self.last_best_index].local_search(
+                #         self.subproblems.weight_vectors[self.best_solution_to_subproblem[self.last_best_index]]))
+                #     new_population_subproblems.append(self.best_solution_to_subproblem[self.last_best_index])
                     # last_best = random.choice(self.get_multi_best_solution())
                     # new_population.append(last_best.local_search(
                     #     self.subproblems.weight_vectors[self.best_solution_to_subproblem[self.last_best_index]]))
@@ -512,7 +513,7 @@ class MODE2:
         return best_results, best_fitness_list, fitness_front
 
 
-class MOEA2(EarlyTrain):
+class MOEAD(EarlyTrain):
     def __init__(self, dst_train, args, fraction=0.5, random_seed=None, epochs=200, selection_method="Info",
                  specific_model=None, balance=False, **kwargs):
         super().__init__(dst_train, args, fraction, random_seed, epochs, specific_model, **kwargs)
@@ -590,7 +591,7 @@ class MOEA2(EarlyTrain):
             selection_results = [np.array([], dtype=np.int64) for i in range(self.args.solution_num)]
             scores = []
             for c in range(self.args.num_classes):
-                test_data_folder = 'test_data/multi_{}'.format(c)
+                test_data_folder = 'test_data/ldea_{}'.format(c)
                 class_index = np.arange(self.n_train)[self.dst_train.targets == c]
                 features_matrix, confidence = self.construct_matrix(class_index)
                 # data = features_matrix.cpu().numpy()
@@ -611,7 +612,7 @@ class MOEA2(EarlyTrain):
                 #                        MMDCalculator(features_matrix, size, device='cuda')]
                 # fitness_calculators = [UniquenessCalculator(confidence, size, device='cuda'),
                 #                        DiversityCalculator(features_matrix, size, device='cuda')]
-                solver = MODE2(fitness_calculators=fitness_calculators, total_gene_num=len(class_index), budget=size,
+                solver = MOEADAlgorithm(fitness_calculators=fitness_calculators, total_gene_num=len(class_index), budget=size,
                                device='cuda',
                                population_num=self.args.population, output_folder=test_data_folder, solution_num=self.args.solution_num, step_rate=self.args.step_rate)
                 best_list, best_fitness, fitness_front = solver.solve(iter=self.args.iter)
@@ -632,7 +633,7 @@ class MOEA2(EarlyTrain):
             selection_results = None
             # scores = self.rank_uncertainty()
             # selection_result = np.argsort(scores)[:self.coreset_size]
-        test_data_folder = 'test_data/multi_{}'.format(self.args.dataset)
+        test_data_folder = 'test_data/ldea_{}'.format(self.args.dataset)
         os.makedirs(test_data_folder, exist_ok=True)
         best_file_path = os.path.join(test_data_folder, 'best_multi_{}.npy'.format(self.fraction))
         np.save(best_file_path, selection_results)

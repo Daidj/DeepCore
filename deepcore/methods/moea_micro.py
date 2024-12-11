@@ -118,8 +118,8 @@ class Individual:
         self.step_rate = self.step_rate * 0.9
         search_num = max(1, round(self.step_rate * self.gene_num))
         child = self.clone()
-        child.__remove_worst(weight_vector, search_num)
-        child.__greedy_search(weight_vector, search_num)
+        child.remove_worst(weight_vector, search_num)
+        child.greedy_search(weight_vector, search_num)
         child.set_fitness()
         if child < self:
             print("search better")
@@ -136,7 +136,7 @@ class Individual:
         remove_gene = set(random.sample(list(self.gene), num))
         child.gene = child.gene - remove_gene
         child.unselected_gene.update(remove_gene)
-        child.__greedy_search(weight_vector, num)
+        child.greedy_search(weight_vector, num)
         child.set_fitness()
         if child < self:
             print("search better")
@@ -146,7 +146,7 @@ class Individual:
             print("search equal")
         return child
 
-    def __remove_worst(self, weight_vector, num=1):
+    def remove_worst(self, weight_vector, num=1):
         score_array = torch.stack([c.selected_fitness(self).float() for c in self.fitness_calculators], dim=0).to(
             self.device)
         res = torch.matmul(score_array.T, weight_vector.unsqueeze(1))
@@ -157,6 +157,11 @@ class Individual:
         self.gene.difference_update(selected)
         self.unselected_gene.update(selected)
 
+    def remove_random(self, num):
+        remove_gene = set(random.sample(list(self.gene), num))
+        self.gene.difference_update(remove_gene)
+        self.unselected_gene.update(remove_gene)
+
     def __remove_worst_single(self, weight_vector):
         score_array = torch.stack([c.selected_fitness(self).float() for c in self.fitness_calculators], dim=0).to(
             self.device)
@@ -166,7 +171,7 @@ class Individual:
         self.gene.discard(selected)
         self.unselected_gene.add(selected)
 
-    def __greedy_search(self, weight_vector, num):
+    def greedy_search(self, weight_vector, num):
 
         if len(self.gene) <= 5:
             selected = set(random.sample(list(self.unselected_gene), num))
@@ -210,7 +215,7 @@ class Individual:
         while init_num > 0:
             step = min(init_num, round(self.total_gene_num * 0.001))
             step = max(1, step)
-            self.__greedy_search(weight_vector, step)
+            self.greedy_search(weight_vector, step)
             init_num -= step
             current_rate = current_rate * 0.9
 
@@ -259,18 +264,10 @@ class Individual:
 class SubProblems:
     def __init__(self, target_num, count, device):
         self.target_num = target_num
-        # self.unit_vectors = torch.eye(self.target_num).to(device)
-        if target_num == 1:
-            self.unit_vectors = torch.eye(target_num).to(device)
-        elif target_num == 2:
-            self.unit_vectors = torch.cat([torch.eye(self.target_num), torch.tensor([[1 / 2 ** 0.5, 1 / 2 ** 0.5]])],
-                                          dim=0).to(device)
-
-        self.regions = []
         self.weight_vectors = self.build_subproblem(target_num, count).to(device)
-        self.distance = euclidean_dist(self.weight_vectors, self.weight_vectors)
-        self.set_neighbors()
-        self.decomposition()
+        # self.distance = euclidean_dist(self.weight_vectors, self.weight_vectors)
+        # self.set_neighbors()
+        # self.decomposition()
 
     def build_subproblem(self, target_num, count):
         problems = []
@@ -290,31 +287,11 @@ class SubProblems:
             pass
         return torch.tensor(problems)
 
-    def set_neighbors(self, W=3):
-        # 相邻子问题的数量
-        _, indices = torch.topk(self.distance, k=W + 1, dim=1, largest=False)
-        indices = indices.cpu().numpy()
-        self.neighbors = []
-        for i in range(indices.shape[0]):
-            neighbor = set(indices[i])
-            neighbor.discard(i)
-            self.neighbors.append(neighbor)
 
-    def decomposition(self):
-        # (50, 2) . (2, 2) => (50, 2)
-        dot_products = torch.matmul(self.weight_vectors, self.unit_vectors.T)
-        max_indices = torch.argmax(dot_products, dim=1)
-        for i in range(self.unit_vectors.size()[0]):
-            indices = torch.where(max_indices == i)[0]
-            indices = indices.cpu().numpy()
-            self.regions.append(set(indices))
-        # print(self.regions)
-
-
-class MODE2:
-    def __init__(self, fitness_calculators: list, total_gene_num: int, budget: int, device, population_num=20,
+class MicroMO:
+    def __init__(self, fitness_calculators: list, total_gene_num: int, budget: int, device,
                  output_folder='test_data', solution_num=5, step_rate=0.01):
-        self.population_num = population_num
+        self.population_num = solution_num
         self.total_gene_num = total_gene_num
         self.solution_num = solution_num
         self.step_rate = step_rate
@@ -324,46 +301,22 @@ class MODE2:
             budget = self.total_gene_num
         self.gene_num = budget
         self.target_num = len(fitness_calculators)
-        self.subproblems = SubProblems(target_num=self.target_num, count=population_num, device=device)
+        self.subproblems = SubProblems(target_num=self.target_num, count=solution_num, device=device)
         self.best_population_for_subproblems = []
         Individual.fitness_calculators = fitness_calculators
-        for i in range(population_num):
-            individual = Individual(total_gene_num=self.total_gene_num, gene_num=self.gene_num,
-                                    target_num=self.target_num, step_rate=self.step_rate)
-            # individual.random_init()
-            # print('random: ', individual.fitness)
-            # if i % 10 == 0:
-            individual.greedy_init(self.subproblems.weight_vectors[i])
-            # else:
-            #     individual.greedy_init(self.subproblems.weight_vectors[i], 0.9 - (i % 10) / 20)
-            self.best_population_for_subproblems.append(individual)
-        self.best_population_for_pareto = self.best_population_for_subproblems
 
-        # self.best_population_for_pareto = bubble_sort(self.best_population_for_pareto)
-        # sorted(self.best_population_for_pareto)
+        self.best_population_for_subproblems = [None for i in range(solution_num)]
 
         self.best_solution = []
         self.best_solution_to_subproblem = []
-        self.count_set = np.ones(self.population_num)
-        for i in range(population_num):
-            current = self.best_population_for_subproblems[i]
-            nondeminated = True
-            for other in self.best_population_for_subproblems:
-                if current > other:
-                    nondeminated = False
-                    break
-            if nondeminated:
-                self.count_set[i] = self.count_set[i] + 1
-                self.best_solution.append(current)
-                self.best_solution_to_subproblem.append(i)
-        self.last_best_index = int(len(self.best_solution) / 2)
+
         self.device = device
-        self.greedy_best = []
-        for calculator in fitness_calculators:
-            i = Individual(self.total_gene_num, self.gene_num, self.target_num)
-            i.init(calculator.get_best())
-            self.greedy_best.append(i)
-        self.greedy_best_fitness_points = [p.fitness for p in self.greedy_best]
+        # self.greedy_best = []
+        # for calculator in fitness_calculators:
+        #     i = Individual(self.total_gene_num, self.gene_num, self.target_num)
+        #     i.init(calculator.get_best())
+        #     self.greedy_best.append(i)
+        # self.greedy_best_fitness_points = [p.fitness for p in self.greedy_best]
         self.output_folder = output_folder
 
     def get_best_in_solution(self, fraction=None):
@@ -409,110 +362,80 @@ class MODE2:
         self.best_solution = final_best_solution
         print("update best solution: ", len(self.best_solution))
 
-    def solve(self, iter=50):
-        L = 10
-        utility = np.ones((self.population_num, L))
+    def solve_problem(self, index, iter=20):
+        weight_vector = self.subproblems.weight_vectors[index]
+        individual = Individual(total_gene_num=self.total_gene_num, gene_num=self.gene_num,
+                                    target_num=self.target_num, step_rate=self.step_rate)
+        individual.greedy_init(weight_vector)
 
-        beta = min(self.target_num / 5, 0.8)
+        print(individual.fitness, " micro search: ", weight_vector)
+        search_num = max(1, round(self.step_rate * self.gene_num))
+        break_time = 5
         for i in range(iter):
-            print("Iter:", i)
-            utility[:, i % L] = 1
-            for opr in range(self.population_num):
 
-                regions = self.subproblems.regions
-                local_probability = np.array([])
-                for region in regions:
-                    local_probability = np.append(local_probability, 1 / self.count_set[list(region)].sum())
-                selected_region = np.argmax(local_probability)
-                if random.random() < beta:
-
-                    selected_subproblem = random.choice(list(self.subproblems.regions[selected_region]))
-
+            current_search_num = max(1, round(search_num*(iter-i)/iter))
+            child = individual.clone()
+            if random.random() < 0.7:
+                if current_search_num > 2:
+                    num = round(current_search_num / 2)
+                    child.remove_worst(weight_vector, num)
+                    child.remove_worst(weight_vector, current_search_num - num)
                 else:
-                    if i == 0 and opr < 0.5 * L:
-                        print("random subproblem")
-                        selected_subproblem = random.randint(0, self.population_num - 1)
+                    child.remove_worst(weight_vector, current_search_num)
+            else:
+                child.remove_random(current_search_num)
+            if current_search_num > 2:
+                num = round(current_search_num/2)
+                child.greedy_search(weight_vector, num)
+                child.greedy_search(weight_vector, current_search_num-num)
+            else:
+                child.greedy_search(weight_vector, current_search_num)
+            child.set_fitness()
+            if child.get_single_fitness(weight_vector) < individual.get_single_fitness(weight_vector):
+                individual = child
+                print("search better")
+                print(individual.fitness)
+            else:
+
+                if current_search_num == 1:
+                    if break_time <= 0:
+                        print('early break')
+                        break
                     else:
-                        utility_sum = np.sum(utility, axis=1)
-                        selected_subproblem = np.argmax(utility_sum)
-                print('subprobleam: ', selected_subproblem)
-                parent_1 = self.best_population_for_subproblems[selected_subproblem]
-                neighboring = random.choice(list(self.subproblems.neighbors[selected_subproblem]))
-                parent_2 = self.best_population_for_subproblems[neighboring]
-                child_1, child_2 = parent_1.crossover(parent_2)
-                child_3 = parent_1.mutation()
-                child_4 = parent_2.mutation()
-                # child_5 = parent_1.local_search(self.subproblems.weight_vectors[selected_subproblem])
-                # child_6 = parent_2.local_search(self.subproblems.weight_vectors[neighboring])
-                # new_population = [parent_1, parent_2, child_1, child_2, child_3, child_4, child_5, child_6]
-                new_population = [parent_1, parent_2, child_1, child_2, child_3, child_4]
-                new_population_subproblems = [selected_subproblem if i % 2 == 0 else neighboring for i in
-                                              range(len(new_population))]
-                if opr % 5 == 0:
-                    new_population.append(self.best_solution[self.last_best_index].local_search(
-                        self.subproblems.weight_vectors[self.best_solution_to_subproblem[self.last_best_index]]))
-                    new_population_subproblems.append(self.best_solution_to_subproblem[self.last_best_index])
-                    # last_best = random.choice(self.get_multi_best_solution())
-                    # new_population.append(last_best.local_search(
-                    #     self.subproblems.weight_vectors[self.best_solution_to_subproblem[self.last_best_index]]))
-                    # new_population_subproblems.append(self.best_solution_to_subproblem[self.last_best_index])
-                single_objective_1 = np.array(
-                    [p.get_single_fitness(self.subproblems.weight_vectors[selected_subproblem]) for p in
-                     new_population])
-                self.best_population_for_subproblems[selected_subproblem] = new_population[
-                    np.argmin(single_objective_1)]
-                single_objective_2 = np.array(
-                    [p.get_single_fitness(self.subproblems.weight_vectors[neighboring]) for p in new_population])
-                self.best_population_for_subproblems[neighboring] = new_population[np.argmin(single_objective_2)]
+                        break_time -= 1
+        self.best_population_for_subproblems[index] = individual
 
-                for j in range(2, len(new_population)):
-                    current = new_population[j]
-                    nondeminated = True
-                    replaced = False
-                    for k in range(len(self.best_solution)):
-                        if current > self.best_solution[k]:
-                            nondeminated = False
-                            break
-                        elif current < self.best_solution[k]:
-                            self.best_solution[k] = current
-                            self.best_solution_to_subproblem[k] = new_population_subproblems[j]
-                            replaced = True
-                            break
-                    if nondeminated:
-                        if not replaced:
-                            self.best_solution.append(current)
-                            self.best_solution_to_subproblem.append(new_population_subproblems[j])
-                        self.count_set[new_population_subproblems[j]] = self.count_set[
-                                                                            new_population_subproblems[j]] + 1
-                    if not current > new_population[0]:
-                        utility[selected_subproblem][i % L] = utility[selected_subproblem][i % L] + 1
-            # if i % 5 == 4:
-            #     self.update_best_solution()
-            fitness_front = [p.fitness for p in self.best_solution]
-            subproblems_front = [p.fitness for p in self.best_population_for_subproblems]
-            best = self.get_best_in_solution()
-            self.last_best_index = best
-            if i % 10 == 0:
-                plot_nested_list(subproblems_front, diff=self.greedy_best_fitness_points,
-                                 title="Iter_subproblems_{}".format(i),
-                                 important_points=[self.best_solution[best].fitness], folder_name=self.output_folder)
-                plot_nested_list(fitness_front, diff=self.greedy_best_fitness_points, title="Iter_pareto_{}".format(i),
-                                 important_points=[self.best_solution[best].fitness], folder_name=self.output_folder)
 
-        self.update_best_solution()
-        # 对帕累托前沿的点进行评分并选择最优解
-        best_list = self.get_multi_best_solution()
-        fitness_front = [p.fitness for p in self.best_solution]
-        best_results = [list(self.best_solution[b].gene) for b in best_list]
-        best_fitness_list = [self.best_solution[b].fitness for b in best_list]
+    def solve(self, iter=50):
+        self.solve_problem(0, iter)
+        self.solve_problem(-1, iter)
+        Individual.fitness_calculators[0].set_min_fitness(self.best_population_for_subproblems[-1].fitness[0])
+        Individual.fitness_calculators[0].set_max_fitness(self.best_population_for_subproblems[0].fitness[0])
+        Individual.fitness_calculators[1].set_min_fitness(self.best_population_for_subproblems[0].fitness[1])
+        Individual.fitness_calculators[1].set_max_fitness(self.best_population_for_subproblems[-1].fitness[1])
+        self.best_population_for_subproblems[0].set_fitness()
+        self.best_population_for_subproblems[-1].set_fitness()
+        for i in range(self.solution_num):
+            if self.best_population_for_subproblems[i] is None:
+                if self.best_population_for_subproblems[0].fitness[1] == 0:
+                    self.best_population_for_subproblems[i] = self.best_population_for_subproblems[-1]
+                else:
+                    self.solve_problem(i, iter)
+        fitness_front = [p.fitness for p in self.best_population_for_subproblems]
+        # plot_nested_list(subproblems_front, diff=self.greedy_best_fitness_points,
+        #                      title="Iter_subproblems_{}".format(i),
+        #                      important_points=[self.best_solution[best].fitness], folder_name=self.output_folder)
+        best_results = [list(i.gene) for i in self.best_population_for_subproblems]
+        best_fitness_list = [i.fitness for i in self.best_population_for_subproblems]
+
         print("best fitness: ", best_fitness_list)
-        plot_nested_list(fitness_front, diff=self.greedy_best_fitness_points, important_points=best_fitness_list,
+        plot_nested_list(fitness_front, diff=None, important_points=fitness_front,
                          title="final_pareto", folder_name=self.output_folder)
         print("fitness front: ", len(fitness_front))
         return best_results, best_fitness_list, fitness_front
 
 
-class MOEA2(EarlyTrain):
+class Micro(EarlyTrain):
     def __init__(self, dst_train, args, fraction=0.5, random_seed=None, epochs=200, selection_method="Info",
                  specific_model=None, balance=False, **kwargs):
         super().__init__(dst_train, args, fraction, random_seed, epochs, specific_model, **kwargs)
@@ -590,7 +513,7 @@ class MOEA2(EarlyTrain):
             selection_results = [np.array([], dtype=np.int64) for i in range(self.args.solution_num)]
             scores = []
             for c in range(self.args.num_classes):
-                test_data_folder = 'test_data/multi_{}'.format(c)
+                test_data_folder = 'test_data/micro_{}'.format(c)
                 class_index = np.arange(self.n_train)[self.dst_train.targets == c]
                 features_matrix, confidence = self.construct_matrix(class_index)
                 # data = features_matrix.cpu().numpy()
@@ -611,9 +534,9 @@ class MOEA2(EarlyTrain):
                 #                        MMDCalculator(features_matrix, size, device='cuda')]
                 # fitness_calculators = [UniquenessCalculator(confidence, size, device='cuda'),
                 #                        DiversityCalculator(features_matrix, size, device='cuda')]
-                solver = MODE2(fitness_calculators=fitness_calculators, total_gene_num=len(class_index), budget=size,
+                solver = MicroMO(fitness_calculators=fitness_calculators, total_gene_num=len(class_index), budget=size,
                                device='cuda',
-                               population_num=self.args.population, output_folder=test_data_folder, solution_num=self.args.solution_num, step_rate=self.args.step_rate)
+                               solution_num=self.args.solution_num, output_folder=test_data_folder,  step_rate=self.args.step_rate)
                 best_list, best_fitness, fitness_front = solver.solve(iter=self.args.iter)
                 time2 = time.time()
                 print("heuristic time: ", time2 - time1)
@@ -632,7 +555,7 @@ class MOEA2(EarlyTrain):
             selection_results = None
             # scores = self.rank_uncertainty()
             # selection_result = np.argsort(scores)[:self.coreset_size]
-        test_data_folder = 'test_data/multi_{}'.format(self.args.dataset)
+        test_data_folder = 'test_data/micro_{}'.format(self.args.dataset)
         os.makedirs(test_data_folder, exist_ok=True)
         best_file_path = os.path.join(test_data_folder, 'best_multi_{}.npy'.format(self.fraction))
         np.save(best_file_path, selection_results)

@@ -472,6 +472,12 @@ class MMDCalculator:
         scores = (scores - scores.min()) / (scores.max() - scores.min())
         return scores
 
+    def set_min_fitness(self, fitness):
+        self.min_fitness = fitness
+
+    def set_max_fitness(self, fitness):
+        self.max_fitness = fitness
+
     def get_best(self):
         return set(self.calculator.get_min_distance_index(self.gene_num, step_rate=0.12))
 
@@ -564,38 +570,6 @@ class KLCalculator:
             start = end
         return selected
 
-class SizeCalculator:
-    def __init__(self, total_num, gene_num, device, metric=euclidean_dist_for_batch):
-        self.total_num = total_num
-        self.gene_num = gene_num
-        self.min_fitness = torch.min(self.confidence) + 1e-6
-        self.max_fitness = torch.max(self.confidence) + 1e-6
-        self.confidence = (self.confidence - self.min_fitness) / (self.max_fitness - self.min_fitness)
-
-    def fitness(self, individual):
-        selected = torch.tensor(list(individual.gene))
-        fitness = torch.mean(self.confidence[selected])
-        # normalization_fitness = (fitness - self.min_fitness)/(self.max_fitness - self.min_fitness)
-        return fitness.item()
-
-    def unselected_fitness(self, individual):
-        unselected = torch.tensor(list(individual.unselected_gene))
-        scores = self.confidence[unselected]
-        # scores = (scores - scores.min()) / (scores.max() - scores.min())
-        return scores
-
-    def selected_fitness(self, individual):
-        selected = torch.tensor(list(individual.gene))
-        scores = self.confidence[selected]
-        # scores = (scores - scores.min()) / (scores.max() - scores.min())
-        # normalization_fitness = (fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
-        return scores
-
-    def get_best(self):
-        _, sorted_indices = torch.sort(self.confidence)
-        res_importance = sorted_indices[:self.gene_num]
-        return set(res_importance)
-
 class InfoCalculator:
     def __init__(self, matrix, confidence, gene_num, device, metric=euclidean_dist_for_batch):
         if type(matrix) == torch.Tensor:
@@ -618,10 +592,13 @@ class InfoCalculator:
         self.similarity_redundancy_ratio = 1.0
         # second_min_values = torch.kthvalue(self.distance, 2, dim=1).values
 
-        self.min_fitness = 0.0 - self.similarity_redundancy_ratio*1.0*gene_num
+        self.min_normalization_fitness = 0.0 - self.similarity_redundancy_ratio * 1.0 * gene_num
         # max_dis, _ = torch.max(self.distance, dim=1)
         # max_fitness = torch.max(max_dis)
-        self.max_fitness = gene_num
+        self.max_normalization_fitness = gene_num
+        self.min_fitness = 0.0
+        self.max_fitness = 1.0
+
         _, min_num = first_stage_search(matrix=matrix, budget=gene_num, search=False)
         self.min_num = min_num
         self.device = device
@@ -644,7 +621,9 @@ class InfoCalculator:
         scores = uncertainty - self.similarity_redundancy_ratio * redundancy_info
         fitness = torch.sum(scores).item()
         # 值越小说明解越好
-        normalization_fitness = (fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        normalization_fitness = (fitness - self.min_normalization_fitness) / (self.max_normalization_fitness - self.min_normalization_fitness)
+        normalization_fitness = (normalization_fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
+
         return normalization_fitness
 
     def unselected_fitness(self, individual):
@@ -692,6 +671,12 @@ class InfoCalculator:
         # scores = scores*0.8+0.1
 
         return score
+
+    def set_min_fitness(self, fitness):
+        self.min_fitness = fitness
+
+    def set_max_fitness(self, fitness):
+        self.max_fitness = fitness
 
     def get_best(self):
         res_greedy = torch.from_numpy(
