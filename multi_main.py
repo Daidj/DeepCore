@@ -173,6 +173,14 @@ def multi_main(wb=None):
         algorithm_end_time = time.time()
         global_best_prec1 = 0.0
         global_best_index = 0
+        global_best_train_loader = None
+        global_best_network = None
+        global_best_criterion = None
+        global_best_optimizer = None
+        global_best_scheduler = None
+        global_best_rec = None
+        global_best_if_weighted = False
+        global_best_test_loader = None
 
         for solution in range(len(subsets)):
             subset = subsets[solution]
@@ -284,7 +292,7 @@ def multi_main(wb=None):
                                                                                                                    + "_") + "unknown.ckpt"),
                                     0, 0.)
 
-                for epoch in range(start_epoch, args.epochs):
+                for epoch in range(start_epoch, args.selection_epochs):
                     # train for one epoch
                     start_time = time.time()
                     train(train_loader, network, criterion, optimizer, scheduler, epoch, args, rec, if_weighted=if_weighted)
@@ -342,7 +350,7 @@ def multi_main(wb=None):
                 start_epoch = 0
                 checkpoint = {}
                 # visdom
-                epoch_list =[i for i in range(start_epoch, args.epochs)]
+                epoch_list =[i for i in range(start_epoch, args.selection_epochs)]
                 vis.line(Y=rec.train_loss, X=epoch_list, win='train_loss_{}_{}'.format(exp, solution), opts = dict(title='train_loss_{}_{}'.format(exp, solution), showlegend=True))
                 vis.line(Y=rec.train_acc, X=epoch_list, win='train_acc_{}_{}'.format(exp, solution), opts=dict(title='train_acc_{}_{}'.format(exp, solution), showlegend=True))
                 vis.line(Y=rec.lr, X=epoch_list, win='train_lr_{}_{}'.format(exp, solution),
@@ -363,8 +371,39 @@ def multi_main(wb=None):
                     best_index_path = os.path.join(test_data_folder, 'best_index_{}.npy'.format(args.fraction))
                     numpy.save(best_file_path, subset["indices"])
                     numpy.save(best_index_path, numpy.array([solution]))
+                    global_best_train_loader = train_loader
+                    global_best_network = network
+                    global_best_criterion = criterion
+                    global_best_optimizer = optimizer
+                    global_best_scheduler = scheduler
+                    global_best_rec = rec
+                    global_best_if_weighted = if_weighted
+                    global_best_test_loader = test_loader
+
+
+        for epoch in range(args.selection_epochs, args.epochs):
+            # train for one epoch
+            start_time = time.time()
+            train(global_best_train_loader, global_best_network, global_best_criterion, global_best_optimizer,
+                  global_best_scheduler, epoch, args, global_best_rec, if_weighted=global_best_if_weighted)
+            end_time = time.time()
+            print("Train time: {}".format(end_time - start_time))
+
+            # evaluate on validation set
+            if args.test_interval > 0 and (epoch + 1) % args.test_interval == 0:
+                prec1 = test(global_best_test_loader, global_best_network, global_best_criterion, epoch, args,
+                             global_best_rec)
+
+                # remember best prec@1 and save checkpoint
+                is_best = prec1 > global_best_prec1
+
+                if is_best:
+                    global_best_prec1 = prec1
+                    best_epoch = epoch
+
         exp_end_time = time.time()
-        vis.text("Exp {} result: Best accuracy: {}, Best index: {} \n".format(exp,global_best_prec1, global_best_index), win='result', append=True)
+        vis.text("Exp {} result: Best accuracy: {}, Best index: {} \n".format(exp, global_best_prec1, global_best_index),
+                 win='result', append=True)
 
         if wb != None:
             wb.append('样本数量', exp, selected_length)
