@@ -1,4 +1,6 @@
 import os
+
+import numpy
 import torch.nn as nn
 import argparse
 
@@ -169,6 +171,9 @@ def main(wb=None):
         algorithm_end_time = time.time()
         selected_length = len(subset["indices"])
         print("selected length: ", selected_length)
+        folder = 'test_data/{}_{}'.format(args.selection, args.dataset)
+        os.makedirs(folder, exist_ok=True)
+        numpy.save(os.path.join(folder, 'best_{}'.format(args.fraction)), subset["indices"])
         mmd_distance = 0
         if "mmd_distance" in subset.keys() and subset["mmd_distance"] is not None:
             mmd_distance = torch.tensor(subset["mmd_distance"]).sum().item()
@@ -221,8 +226,10 @@ def main(wb=None):
             if model == 'TextCNN':
                 n_vocal = dst_train.n_vocab
                 network = nets.__dict__[model](num_classes, n_vocal).to(args.device)
+            elif model == 'TDNN':
+                network = nets.__dict__[model](num_class=num_classes, input_size=im_size).to(args.device)
             else:
-                network = nets.__dict__[model](channel, num_classes, im_size, pretrained=False).to(args.device)
+                network = nets.__dict__[model](channel, num_classes, im_size, pretrained=False).to()
 
             if args.device == "cpu":
                 print("Using CPU.")

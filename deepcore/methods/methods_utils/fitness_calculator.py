@@ -13,6 +13,7 @@ from mmd_algorithm import MMD
 def k_center_greedy(matrix, budget: int, metric, device, random_seed=None, index=None, already_selected=None):
     if type(matrix) == torch.Tensor:
         assert matrix.dim() == 2
+        matrix = matrix.to(device)
     elif type(matrix) == np.ndarray:
         assert matrix.ndim == 2
         matrix = torch.from_numpy(matrix).requires_grad_(False).to(device)
@@ -455,7 +456,7 @@ class MMDCalculator:
         selected = torch.tensor(list(individual.gene))
         fitness = self.calculator.mmd_for_data_set(selected)
         normalization_fitness = (fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
-        return normalization_fitness
+        return normalization_fitness, fitness
 
     def unselected_fitness(self, individual):
         scores = self.calculator.get_unselected_scores(individual.gene, individual.unselected_gene)
@@ -476,7 +477,7 @@ class MMDCalculator:
         self.min_fitness = fitness
 
     def set_max_fitness(self, fitness):
-        self.max_fitness = fitness
+        self.max_fitness = max(1e-6, fitness)
 
     def get_best(self):
         return set(self.calculator.get_min_distance_index(self.gene_num, step_rate=0.12))
@@ -605,26 +606,27 @@ class InfoCalculator:
 
     def fitness(self, individual):
         if self.gene_num <= self.min_num:
-            return 0.0
-        selected_tensor = torch.tensor(list(individual.gene))
-        unselected_tensor = torch.tensor(list(individual.unselected_gene))
-        selected_dis = self.distance[selected_tensor, :][:, selected_tensor]
-        selected_min_dis = torch.kthvalue(selected_dis, 2, dim=1).values
-        selected_bak_dis = torch.kthvalue(selected_dis, 3, dim=1).values
+            origin_fitness = 0.0
+        else:
+            selected_tensor = torch.tensor(list(individual.gene))
+            unselected_tensor = torch.tensor(list(individual.unselected_gene))
+            selected_dis = self.distance[selected_tensor, :][:, selected_tensor]
+            selected_min_dis = torch.kthvalue(selected_dis, 2, dim=1).values
+            selected_bak_dis = torch.kthvalue(selected_dis, 3, dim=1).values
 
-        result_tensor = torch.where(selected_dis != selected_min_dis, torch.tensor(0.0),
-                                    selected_bak_dis - selected_dis)
-        other_dis = torch.sum(result_tensor, dim=1)
-        redundancy_info = (selected_min_dis - other_dis)
-        uncertainty = self.confidence[selected_tensor]
+            result_tensor = torch.where(selected_dis != selected_min_dis, torch.tensor(0.0),
+                                        selected_bak_dis - selected_dis)
+            other_dis = torch.sum(result_tensor, dim=1)
+            redundancy_info = (selected_min_dis - other_dis)
+            uncertainty = self.confidence[selected_tensor]
 
-        scores = uncertainty - self.similarity_redundancy_ratio * redundancy_info
-        fitness = torch.sum(scores).item()
-        # 值越小说明解越好
-        normalization_fitness = (fitness - self.min_normalization_fitness) / (self.max_normalization_fitness - self.min_normalization_fitness)
-        normalization_fitness = (normalization_fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
+            scores = uncertainty - self.similarity_redundancy_ratio * redundancy_info
+            fitness = torch.sum(scores).item()
+            # 值越小说明解越好
+            origin_fitness = (fitness - self.min_normalization_fitness) / (self.max_normalization_fitness - self.min_normalization_fitness)
+        normalization_fitness = (origin_fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
 
-        return normalization_fitness
+        return normalization_fitness, origin_fitness
 
     def unselected_fitness(self, individual):
         if self.gene_num <= self.min_num:
@@ -676,7 +678,7 @@ class InfoCalculator:
         self.min_fitness = fitness
 
     def set_max_fitness(self, fitness):
-        self.max_fitness = fitness
+        self.max_fitness = max(1e-6, fitness)
 
     def get_best(self):
         res_greedy = torch.from_numpy(

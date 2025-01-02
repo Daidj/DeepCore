@@ -11,9 +11,10 @@ import numpy as np
 from scipy.stats import gaussian_kde
 import matplotlib.pyplot as plt
 
-from deepcore.methods import MMDCalculator, k_center_greedy, euclidean_dist, k_center_uncertainty_greedy
+from deepcore.methods import MMDCalculator, k_center_greedy, euclidean_dist_for_batch, euclidean_dist
 from deepcore.methods.micro import micro
 from deepcore.methods.two_stage_search import two_stage_search
+from deepcore.methods.self_adaptation_search import self_adaptation_search
 from kl import run_test
 from mmd_algorithm import MMD
 
@@ -112,55 +113,24 @@ def scatter_features_2():
 
 
 if __name__ == '__main__':
+    # front_tensor = torch.tensor([[3.0, 0.0], [1.5, 0.0], [2.0, 0.0]])
+    # best_point = torch.min(front_tensor, dim=0).values
+    # worst_point = torch.max(front_tensor, dim=0).values
+    # scores = (front_tensor - best_point) / (worst_point - best_point+1e-8)
+    # fraction = torch.tensor([0.5, 0.5])
+    # fraction_matrix = fraction.unsqueeze(0).repeat(scores.size(0), 1)
+    # scores = torch.sum(scores * fraction_matrix, dim=1)
+    # best = torch.argmin(scores)
+    # print(best)
 
-    # import torch
-    #
-    #
-    # def cosine_similarity(A, B):
-    #     # 计算 A 和 B 的 L2 范数
-    #     norm_A = A.norm(dim=1, keepdim=True)  # (n1, 1)
-    #     norm_B = B.norm(dim=1, keepdim=True)  # (n2, 1)
-    #
-    #     # 计算 A 和 B 的点积
-    #     similarity_matrix = torch.mm(A, B.t())  # (n1, m) @ (m, n2) -> (n1, n2)
-    #
-    #     # 归一化
-    #     cosine_sim = similarity_matrix / (norm_A * norm_B.t())  # (n1, n2)
-    #
-    #     return cosine_sim
-    #
-    #
-    # # 示例数据
-    # n1, n2, m = 4, 3, 5
-    # A = torch.rand(n1, m)  # 随机生成 n1*m 的张量
-    # B = torch.rand(n2, m)  # 随机生成 n2*m 的张量
-    #
-    # # 计算余弦相似度
-    # similarity_matrix = cosine_similarity(A, B)
-    #
-    # print("余弦相似度矩阵:\n", similarity_matrix)
-    #
-    # # print(torch.cosine_similarity(A, B, dim=1))
-    #
-    # def batch_cosine_similarity(A, B):
-    #     n1 = A.size(0)
-    #     n2 = B.size(0)
-    #
-    #     # 初始化相似度矩阵
-    #     similarity_matrix = torch.zeros(n1, n2)
-    #
-    #     # 计算每对向量的余弦相似度
-    #     for i in range(n1):
-    #         similarity_matrix[i] = torch.cosine_similarity(A[i].unsqueeze(0), B)  # (1, m) 与 (n2, m)
-    #
-    #     return similarity_matrix
-    #
-    #
-    # # 计算余弦相似度
-    # similarity_matrix = batch_cosine_similarity(A, B)
-    #
-    # print("余弦相似度矩阵:\n", similarity_matrix)
-    #
+    # rate = 0.1
+    # sum = 0.0
+    # i = 0
+    # while sum < 1.0:
+    #     sum += rate
+    #     rate = rate*0.9
+    #     i += 1
+    # print(i)
     # exit(0)
 
     # import torch
@@ -186,14 +156,25 @@ if __name__ == '__main__':
         # print('kl: ', kl_div)
         # data1 = torch.load('test_data/importance_{}.pt'.format(c)).cpu().numpy()
         print(c)
-        dataset = 'MNIST'
-        features_matrix = torch.load('test_data/{}/features_matrix_{}.pth'.format(c, dataset)).cpu().numpy()
-        confidence = torch.load('test_data/{}/importance_{}.pth'.format(c, dataset))
-        # features_matrix = torch.load('test_data/features_matrix_{}.pt'.format(c)).cpu().numpy()
-        # confidence = torch.load('test_data/importance_{}.pt'.format(c))
+        dataset = 'CIFAR100'
+        # features_matrix = torch.load('test_data/{}/features_matrix_{}.pth'.format(c, dataset)).cpu().numpy()
+        # confidence = torch.load('test_data/{}/importance_{}.pth'.format(c, dataset))
+        features_matrix = torch.load('test_data/features_matrix_{}.pt'.format(c)).cpu()
+        confidence = torch.load('test_data/importance_{}.pt'.format(c))
+        # center = torch.mean(features_matrix, dim=0)
+        # center = center.reshape(1, -1)
+        center = features_matrix[torch.argmin(confidence)]
+        center = center.reshape(1, -1)
+        dis = euclidean_dist(center, features_matrix)
+
 
         total_size = features_matrix.shape[0]
         num = round(0.1*total_size)
+        selected = torch.from_numpy(self_adaptation_search(features_matrix, confidence, num, euclidean_dist, 'cuda')[0])
+        # distance = calculator.mmd_for_data_set(selected)
+        print('Micro:', len(selected))
+        continue
+
         calculator = MMD(features_matrix, 'cuda')
         # selected = torch.tensor(random.sample(list(torch.arange(total_size).numpy()), 1))
         # distance = calculator.mmd_for_data_set(selected)
@@ -204,7 +185,7 @@ if __name__ == '__main__':
         selected = torch.tensor(random.sample(list(torch.arange(total_size).numpy()), num))
         distance = calculator.mmd_for_data_set(selected)
         print('0-500:', distance)
-        selected = torch.from_numpy(two_stage_search(features_matrix, confidence, num, euclidean_dist, 'cuda'))
+        selected = torch.from_numpy(two_stage_search(features_matrix, confidence, num, euclidean_dist, 'cuda')[0])
         distance = calculator.mmd_for_data_set(selected)
         print('Micro:', distance)
         continue

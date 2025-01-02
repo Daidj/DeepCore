@@ -7,3 +7,4 @@ from .resnet import *
 from .vgg import *
 from .wideresnet import *
 from .textcnn import *
+from .tdnn import *

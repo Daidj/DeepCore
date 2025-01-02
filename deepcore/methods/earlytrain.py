@@ -101,6 +101,8 @@ class EarlyTrain(CoresetMethod):
         if self.args.model == 'TextCNN':
             n_vocal = self.dst_train.n_vocab
             self.model = nets.__dict__[self.args.model](self.dst_train.num_classes, n_vocal).to(self.args.device)
+        elif self.args.model == 'TDNN':
+            self.model = nets.__dict__[self.args.model](self.dst_train.num_classes, input_size=self.dst_train.input_size).to(self.args.device)
         else:
             self.model = nets.__dict__[self.args.model if self.specific_model is None else self.specific_model](
                 self.args.channel, self.dst_pretrain_dict["num_classes"] if self.if_dst_pretrain else self.num_classes,

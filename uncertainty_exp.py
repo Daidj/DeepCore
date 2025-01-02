@@ -4,38 +4,38 @@ from WorkBook import WorkBook
 from main import main
 from random_remove_exp import test_model
 
-running_args = {
-    "--dataset": "MNIST",
-    "--model": "LeNet",
-    "--selection": "Uncertainty",
-    # "--num_exp": 5,
-    "--num_exp": 3,
-    "--num_eval": 1,
-    # "--epochs": 20,
-    "--epochs": 200,
-    "--data_path": "data",
-    "--gpu": 0,
-    "--print_freq": 20,
-    "--fraction": 0.01,
-    "--workers": 8,
-    "--optimizer": "Adam",
-    "--lr": 0.002,
-    "--momentum": 0.0,
-    "--weight_decay": 0.0,
-    "--nesterov": False,
-    "--train_batch": 256,
-    "--selection_batch": 256,
-    "--test_interval": 1,
-    "--selection_epochs": 25,
-    # "--selection_epochs": 2,
-    "--selection_momentum": 0.0,
-    "--selection_weight_decay": 0.0,
-    "--selection_optimizer": "Adam",
-    "--selection_lr": 0.002,
-    "--selection_test_interval": 1,
-    "--uncertainty": "LeastConfidence",
-    "--balance": True
-}
+# running_args = {
+#     "--dataset": "MNIST",
+#     "--model": "LeNet",
+#     "--selection": "Uncertainty",
+#     # "--num_exp": 5,
+#     "--num_exp": 3,
+#     "--num_eval": 1,
+#     # "--epochs": 20,
+#     "--epochs": 200,
+#     "--data_path": "data",
+#     "--gpu": 0,
+#     "--print_freq": 20,
+#     "--fraction": 0.01,
+#     "--workers": 8,
+#     "--optimizer": "Adam",
+#     "--lr": 0.002,
+#     "--momentum": 0.0,
+#     "--weight_decay": 0.0,
+#     "--nesterov": False,
+#     "--train_batch": 256,
+#     "--selection_batch": 256,
+#     "--test_interval": 1,
+#     "--selection_epochs": 25,
+#     # "--selection_epochs": 2,
+#     "--selection_momentum": 0.0,
+#     "--selection_weight_decay": 0.0,
+#     "--selection_optimizer": "Adam",
+#     "--selection_lr": 0.002,
+#     "--selection_test_interval": 1,
+#     "--uncertainty": "LeastConfidence",
+#     "--balance": True
+# }
 
 # running_args = {
 #     "--dataset": "CIFAR10",
@@ -234,6 +234,38 @@ running_args = {
 #     "--balance": True
 # }
 
+running_args = {
+    "--dataset": "UrbanSound8K",
+    "--model": "TDNN",
+    "--selection": "Uncertainty",
+    "--num_exp": 5,
+    # "--num_exp": 1,
+    "--num_eval": 1,
+    # "--epochs": 10,
+    "--epochs": 200,
+    "--data_path": "data",
+    "--gpu": 0,
+    "--print_freq": 20,
+    "--fraction": 0.7,
+    "--workers": 8,
+    "--optimizer": "Adam",
+    "--lr": 0.001,
+    "--momentum": 0.0,
+    "--weight_decay": 0.0,
+    "--nesterov": False,
+    "--train_batch": 64,
+    "--selection_batch": 64,
+    "--test_interval": 1,
+    "--selection_epochs": 25,
+    "--selection_momentum": 0.0,
+    "--selection_weight_decay": 0.0,
+    "--selection_optimizer": "Adam",
+    "--selection_lr": 0.001,
+    "--selection_test_interval": 1,
+    "--uncertainty": "LeastConfidence",
+    "--balance": True,
+}
+
 if __name__ == '__main__':
     # test_model()
     wb = WorkBook(running_args["--num_exp"])
@@ -260,6 +292,9 @@ if __name__ == '__main__':
     # wb.to_excel('./excel/data_uncertainty_LeastConfidence_80.xlsx')
     # wb.append('备注', 0, "uncertainty, LeastConfidence, fraction: 0.9, model: ResNet18, dataset:CIFAR100")
     # wb.to_excel('./excel/data_uncertainty_LeastConfidence_90.xlsx')
-    wb.append('备注', 0, "uncertainty, LeastConfidence, fraction: 0.01, model: LeNet, dataset:MNIST")
-    wb.to_excel('./excel/data_uncertainty_LeastConfidence_01.xlsx')
+    # wb.append('备注', 0, "uncertainty, LeastConfidence, fraction: 0.01, model: LeNet, dataset:MNIST")
+    # wb.to_excel('./excel/data_uncertainty_LeastConfidence_01.xlsx')
+
+    wb.append('备注', 0, "uncertainty, LeastConfidence, fraction: 0.7, model: TDNN, dataset:UrbanSound8k")
+    wb.to_excel('./excel/data_uncertainty_LeastConfidence_70.xlsx')
     print("end")

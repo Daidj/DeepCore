@@ -12,3 +12,4 @@ from .sst2 import *
 from .sst5 import *
 from .yelp import *
 from .agnews import *
+from .us8k import *
