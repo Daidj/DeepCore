@@ -327,6 +327,7 @@ class MODE2:
         elif budget > self.total_gene_num:
             budget = self.total_gene_num
         self.gene_num = budget
+        self.fraction = round(budget / total_gene_num, 2)
         self.target_num = len(fitness_calculators)
         self.subproblems = SubProblems(target_num=self.target_num, count=population_num, device=device)
         self.best_population_for_subproblems = [None for i in range(population_num)]
@@ -402,6 +403,7 @@ class MODE2:
             step = 1.0 / (self.solution_num - 1)
             first = random.randint(0, self.solution_num-1)
             fraction = torch.tensor([first*step, 1.0-first*step])
+            print('fraction:', fraction)
         else:
             fraction = torch.tensor(fraction)
         fitness_front = [p.fitness for p in self.best_solution]
@@ -527,9 +529,9 @@ class MODE2:
             self.update_search_weight()
             if i % 10 == 0:
                 plot_nested_list(subproblems_front, diff=self.greedy_best_fitness_points,
-                                 title="Iter_subproblems_{}".format(i),
+                                 title="Iter_subproblems_{}_{}".format(self.fraction, i),
                                  important_points=[self.best_solution[best].fitness], folder_name=self.output_folder)
-                plot_nested_list(fitness_front, diff=self.greedy_best_fitness_points, title="Iter_pareto_{}".format(i),
+                plot_nested_list(fitness_front, diff=self.greedy_best_fitness_points, title="Iter_pareto_{}_{}".format(self.fraction,i),
                                  important_points=[self.best_solution[best].fitness], folder_name=self.output_folder)
 
         print('subprobleam: ', subproblem_count)
@@ -542,7 +544,7 @@ class MODE2:
         best_fitness_list = [self.best_solution[b].fitness for b in best_list]
         print("best fitness: ", best_fitness_list)
         plot_nested_list(fitness_front, diff=self.greedy_best_fitness_points, important_points=best_fitness_list,
-                         title="final_pareto", folder_name=self.output_folder)
+                         title="final_pareto_{}".format(self.fraction), folder_name=self.output_folder)
         print("fitness front: ", len(fitness_front))
         return best_results, best_fitness_list, fitness_front
 
