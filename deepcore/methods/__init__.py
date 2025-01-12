@@ -36,4 +36,5 @@ from .self_adaptation_search import *
 from .moea_d_ldea_new import *
 from .moea_micro import *
 from .moea_d_ldea_origin import *
+from .file import *
 

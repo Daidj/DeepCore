@@ -37,8 +37,8 @@ def two_stage_search(matrix, confidence, budget: int, metric, device, random_see
     distance = euclidean_dist_for_batch(matrix, matrix)
     confidence = confidence.cpu()
     confidence = (confidence - confidence.min() + 1e-3) / (confidence.max() - confidence.min())
-    middle = (1-fraction)/2
-    confidence = torch.abs(confidence-middle)/(0.5+0.5*fraction)
+    # middle = (1-fraction)/2
+    # confidence = torch.abs(confidence-middle)/(0.5+0.5*fraction)
 
     # confidence = torch.abs(confidence-(1-fraction))/max(fraction, (1-fraction))
     similarity_redundancy_ratio = 1.0

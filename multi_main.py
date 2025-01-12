@@ -359,7 +359,7 @@ def multi_main(wb=None):
                 if best_prec1 > global_best_prec1:
                     global_best_prec1 = best_prec1
                     global_best_index = solution
-                    test_data_folder = 'test_data/multi_{}'.format(args.dataset)
+                    test_data_folder = 'test_data/iter_{}_{}/multi_{}'.format(args.selection, args.iter, args.dataset)
                     os.makedirs(test_data_folder, exist_ok=True)
                     best_file_path = os.path.join(test_data_folder, 'best_{}.npy'.format(args.fraction))
                     best_index_path = os.path.join(test_data_folder, 'best_index_{}.npy'.format(args.fraction))

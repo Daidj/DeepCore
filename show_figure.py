@@ -2,6 +2,7 @@ import os
 import numpy as np
 import torch
 from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
 
 from deepcore import datasets
 import matplotlib.pyplot as plt
@@ -34,25 +35,27 @@ if __name__ == '__main__':
     best = []
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
               '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-    fraction = 0.1
+    fraction = 0.7
     plt.figure(figsize=(8, 6))
-    plt.xlim(-15, 20)
-    plt.ylim(-15, 20)
+
     color = 0
     datas = []
     best = []
-    class_num = 5
-    for c in range(10, 10+class_num, 3):
+    class_num = [0, 2, 7, 9]
+    for c in range(13, 14):
 
         folder = 'test_data/multi_{}'.format(c)
         best_file_path = os.path.join(folder, 'best_{}_multi_{}.npy'.format(fraction, dataset))
         features_matrix = torch.load(
             os.path.join(folder, 'features_matrix_{}_{}.pth'.format(fraction, dataset))).cpu().numpy()
-        datas.append(features_matrix)
         confidence = torch.load(os.path.join(folder, 'importance_{}_{}.pth'.format(fraction, dataset)))
         best_result = np.load(best_file_path)
-        best.append(best_result[0])
+        best_index = np.load('test_data/multi_{}/best_index_{}.npy'.format(dataset, fraction))
+        best.append(best_result[best_index[0]])
+        # best.append(np.random.choice(np.arange(features_matrix.shape[0]), size=len(best_result[0]), replace=False))
 
+        # datas.append(features_matrix)
+        datas.append(features_matrix[best[-1]])
         # datas = []
         # range_1 = [0, 9]
         # for i in range(1):
@@ -61,10 +64,12 @@ if __name__ == '__main__':
         #     datas.append(data1)
 
     data = np.concatenate(datas, axis=0)
-    pca = PCA(n_components=2)
-    X_transformed = pca.fit_transform(data)
-    print("\n主成分方差比例:")
-    print(pca.explained_variance_ratio_)
+    # pca = PCA(n_components=2)
+    # X_transformed = pca.fit_transform(data)
+    # print("\n主成分方差比例:")
+    # print(pca.explained_variance_ratio_)
+    tsne = TSNE(n_components=2)
+    X_transformed = tsne.fit_transform(data)
     # arr = np.arange(5000)
     #
     # # 从这个数组中随机挑选n个元素，允许重复
@@ -72,19 +77,24 @@ if __name__ == '__main__':
     # X_transformed = X_transformed[indice]
     print(X_transformed.shape)
     num = int(X_transformed.shape[0]/len(best))
+    # plt.xlim(-40, 55)
+    # plt.ylim(-45, 50)
+    plt.xlim(round(min(X_transformed[:, 0]))-2, round(max(X_transformed[:, 0]))+2)
+    plt.ylim(round(min(X_transformed[:, 1]))-2, round(max(X_transformed[:, 1]))+2)
     for i in range(len(best)):
         center = np.mean(X_transformed[i*num:(i+1)*num], axis=0)
-        # plt.scatter(X_transformed[i*num:(i+1)*num][:, 0], X_transformed[i*num:(i+1)*num][:, 1],
-        #             c=colors[color],
-        #             s=3)
-        # color += 1
-        plt.scatter([center[0]], [center[1]],
-                    c=colors[color],
-                    s=10)
-        color += 1
-        plt.scatter(X_transformed[i*num:(i+1)*num][best, 0], X_transformed[i*num:(i+1)*num][best, 1],
+        plt.scatter(X_transformed[i*num:(i+1)*num][:, 0], X_transformed[i*num:(i+1)*num][:, 1],
                     c=colors[color],
                     s=5)
+        color += 1
+        # plt.scatter([center[0]], [center[1]],
+        #             c=colors[color],
+        #             s=10)
+        # color += 1
+        # plt.scatter(X_transformed[i*num:(i+1)*num][best, 0], X_transformed[i*num:(i+1)*num][best, 1],
+        #             c=colors[color],
+        #             s=5)
+        # color += 1
 
         # 添加标签和标题
     plt.xlabel('X')

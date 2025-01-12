@@ -15,7 +15,7 @@ class TINYMNISTDataSet(Dataset):
         indices = np.array([], dtype=np.int64)
         for c in range(self.num_classes):
             class_index = np.arange(n_train)[dst_train.targets == c]
-            indices = np.append(indices, class_index[0:50])
+            indices = np.append(indices, class_index[0:200])
         self.data = dst_train.data[indices]
         self.targets = dst_train.targets[indices]
         self.transform = transform

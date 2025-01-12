@@ -3,6 +3,7 @@ import os
 import time
 
 import matplotlib.pyplot as plt
+import pickle
 from torch.utils.data import TensorDataset
 
 from .earlytrain import EarlyTrain
@@ -71,7 +72,8 @@ class Individual:
         self.unselected_gene = set(torch.arange(total_gene_num).numpy())
         self.target_num = target_num
         self.step_rate = step_rate
-        self.fitness = None
+        self.fitness = [None for i in range(len(Individual.fitness_calculators))]
+        self.origin_fitness = [None for i in range(len(Individual.fitness_calculators))]
 
     def clone(self):
         copy_ind = copy.deepcopy(self)
@@ -248,13 +250,11 @@ class Individual:
         return dot_product.item()
 
     def set_fitness(self):
-        self.fitness = [round(calculator.fitness(self), 6) for calculator in self.fitness_calculators]
-    # def compare_individual(individual_1, individual_2):
-    #     if all(a <= b for a, b in zip(individual_1, individual_2)):
-    #         return -1
-    #     else:
-    #         return 1
-
+        # self.fitness = [round(calculator.fitness(self), 6) for calculator in self.fitness_calculators]
+        for i in range(len(self.fitness_calculators)):
+            f, origin_f = self.fitness_calculators[i].fitness(self)
+            self.fitness[i] = round(f, 6)
+            self.origin_fitness[i] = round(origin_f, 6)
 
 class SubProblems:
     def __init__(self, target_num, count, device):
@@ -373,6 +373,7 @@ class MOEADAlgorithm:
             step = 1.0 / (self.solution_num - 1)
             first = random.randint(0, self.solution_num-1)
             fraction = torch.tensor([first*step, 1.0-first*step])
+            print('fraction:', fraction)
         else:
             fraction = torch.tensor(fraction)
         fitness_front = [p.fitness for p in self.best_solution]
@@ -410,11 +411,11 @@ class MOEADAlgorithm:
         self.best_solution = final_best_solution
         print("update best solution: ", len(self.best_solution))
 
-    def solve(self, iter=50):
+    def solve(self, iter=50, label=0):
         L = 10
         utility = np.ones((self.population_num, L))
-
-        beta = min(self.target_num / 10, 0.4)
+        process_data_folder = 'process_data'
+        beta = min(self.target_num / 5, 0.4)
         for i in range(iter):
             print("Iter:", i)
             utility[:, i % L] = 1
@@ -494,6 +495,17 @@ class MOEADAlgorithm:
             best = self.get_best_in_solution()
             self.last_best_index = best
             if i % 10 == 0:
+                self.update_best_solution()
+                best = self.get_best_in_solution()
+                self.last_best_index = best
+                best_list = self.get_multi_best_solution()
+                best_results = [list(self.best_solution[b].gene) for b in best_list]
+                path = os.path.join(process_data_folder, 'iter_{}_label_{}'.format(i, label))
+                os.makedirs(path, exist_ok=True)
+                with open(os.path.join(path, 'best_results.pkl'), 'wb') as f:
+                    pickle.dump(best_results, f)
+                with open(os.path.join(path, 'best_solution.pkl'), 'wb') as f:
+                    pickle.dump(self.best_solution, f)
                 plot_nested_list(subproblems_front, diff=self.greedy_best_fitness_points,
                                  title="Iter_subproblems_{}".format(i),
                                  important_points=[self.best_solution[best].fitness], folder_name=self.output_folder)
@@ -591,7 +603,8 @@ class MOEAD(EarlyTrain):
             selection_results = [np.array([], dtype=np.int64) for i in range(self.args.solution_num)]
             scores = []
             for c in range(self.args.num_classes):
-                test_data_folder = 'test_data/ldea_{}'.format(c)
+                test_data_folder = 'process_data/label_{}'.format(c)
+                os.makedirs(test_data_folder, exist_ok=True)
                 class_index = np.arange(self.n_train)[self.dst_train.targets == c]
                 features_matrix, confidence = self.construct_matrix(class_index)
                 # data = features_matrix.cpu().numpy()
@@ -615,14 +628,14 @@ class MOEAD(EarlyTrain):
                 solver = MOEADAlgorithm(fitness_calculators=fitness_calculators, total_gene_num=len(class_index), budget=size,
                                device='cuda',
                                population_num=self.args.population, output_folder=test_data_folder, solution_num=self.args.solution_num, step_rate=self.args.step_rate)
-                best_list, best_fitness, fitness_front = solver.solve(iter=self.args.iter)
+                best_list, best_fitness, fitness_front = solver.solve(iter=self.args.iter, label=c)
                 time2 = time.time()
                 print("heuristic time: ", time2 - time1)
                 for i in range(len(best_list)):
                     best_result = class_index[np.array(list(best_list[i]))]
                     selection_results[i] = np.append(selection_results[i], best_result)
 
-                os.makedirs(test_data_folder, exist_ok=True)
+
                 best_file_path = os.path.join(test_data_folder, 'best_{}_multi_{}.npy'.format(self.fraction, self.args.dataset))
                 np.save(best_file_path, np.array(best_list))
                 np.save(os.path.join(test_data_folder, 'front_{}_multi_{}.npy'.format(self.fraction, self.args.dataset)), np.array(fitness_front))
@@ -633,7 +646,7 @@ class MOEAD(EarlyTrain):
             selection_results = None
             # scores = self.rank_uncertainty()
             # selection_result = np.argsort(scores)[:self.coreset_size]
-        test_data_folder = 'test_data/ldea_{}'.format(self.args.dataset)
+        test_data_folder = 'test_data/iter_{}/ldea_{}'.format(self.args.iter, self.args.dataset)
         os.makedirs(test_data_folder, exist_ok=True)
         best_file_path = os.path.join(test_data_folder, 'best_multi_{}.npy'.format(self.fraction))
         np.save(best_file_path, selection_results)

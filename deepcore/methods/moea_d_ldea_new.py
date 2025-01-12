@@ -627,7 +627,8 @@ class MOEA2(EarlyTrain):
             selection_results = [np.array([], dtype=np.int64) for i in range(self.args.solution_num)]
             scores = []
             for c in range(self.args.num_classes):
-                test_data_folder = 'test_data/multi_{}'.format(c)
+                test_data_folder = 'test_data/iter_{}/multi_{}'.format(self.args.iter, c)
+                os.makedirs(test_data_folder, exist_ok=True)
                 class_index = np.arange(self.n_train)[self.dst_train.targets == c]
                 features_matrix, confidence = self.construct_matrix(class_index)
                 # data = features_matrix.cpu().numpy()
@@ -658,7 +659,7 @@ class MOEA2(EarlyTrain):
                     best_result = class_index[np.array(list(best_list[i]))]
                     selection_results[i] = np.append(selection_results[i], best_result)
 
-                os.makedirs(test_data_folder, exist_ok=True)
+
                 best_file_path = os.path.join(test_data_folder, 'best_{}_multi_{}.npy'.format(self.fraction, self.args.dataset))
                 np.save(best_file_path, np.array(best_list))
                 np.save(os.path.join(test_data_folder, 'front_{}_multi_{}.npy'.format(self.fraction, self.args.dataset)), np.array(fitness_front))
@@ -669,7 +670,7 @@ class MOEA2(EarlyTrain):
             selection_results = None
             # scores = self.rank_uncertainty()
             # selection_result = np.argsort(scores)[:self.coreset_size]
-        test_data_folder = 'test_data/multi_{}'.format(self.args.dataset)
+        test_data_folder = 'test_data/iter_{}/multi_{}'.format(self.args.iter, self.args.dataset)
         os.makedirs(test_data_folder, exist_ok=True)
         best_file_path = os.path.join(test_data_folder, 'best_multi_{}.npy'.format(self.fraction))
         np.save(best_file_path, selection_results)
