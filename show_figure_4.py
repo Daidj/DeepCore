@@ -2,6 +2,7 @@
 import math
 import os
 import random
+import pandas as pds
 
 import numpy
 import matplotlib.pyplot as plt
@@ -43,79 +44,93 @@ if __name__ == '__main__':
         30: 1,
         40: 0,
         50: 0,
+        60: 0,
         70: 2,
+        80: 0,
         90: 1
     }
 
-    folder = 'process_data_70'
+    folder = 'process_data_50'
     # folder = 'process_data'
-    length = 20
-    ref_point = [1.0, 1.0]
-
-    ind = HV(ref_point=ref_point)
-    average_hv_list = []
-    for iter in best_index_dict.keys():
-
-
-        pf = []
-        hv_list = []
-        for c in range(10):
-            with open(os.path.join(folder, 'iter_{}_label_{}/best_solution'.format(iter, c)), 'rb') as f:
-                best = pickle.load(f)
-                # length = min(len(best), length)
-                # length = len(best)
-                if len(best) > length:
-                    best = random.sample(best, length)
-            best_index = 0
-            fitness_list = []
-            while best_index < len(best):
-
-                class_index = np.arange(n_train)[dst_train.targets == c]
-
-
-                # best = np.load('test_data/multi_{}/best_{}_multi_{}.npy'.format(c, fraction, dataset))
-                # best_index = np.load('test_data/iter_File_{}/multi_{}/best_index_{}.npy'.format(iter, dataset, fraction))[0]
-                # best_index = best_index_dict[iter]
-                # best_i.init(best[best_index])
-                # print('best: ', best_i.fitness)
-                fitness_list.append(best[best_index].fitness)
-                best_index += 1
-
-            fitness_array = np.array(fitness_list)
-            print('label', c)
-            print('length', length)
-
-            hv_value = ind(fitness_array)
-            print("HV", hv_value)
-            hv_list.append(hv_value)
-        print('iter: ', iter)
-        average_hv = np.mean(np.array(hv_list))
-        print('average hv: ', average_hv)
-        average_hv_list.append(average_hv)
-    print(average_hv_list)
-
-    exit(0)
+    # length = 20
+    # ref_point = [1.0, 1.0]
+    #
+    # ind = HV(ref_point=ref_point)
+    # average_hv_list = []
+    # write_data = {
+    #     'iter': [],
+    #     'hv': [],
+    # }
+    # for iter in best_index_dict.keys():
+    #
+    #
+    #     pf = []
+    #     hv_list = []
+    #     for c in range(10):
+    #         with open(os.path.join(folder, 'iter_{}_label_{}/best_solution.pkl'.format(iter, c)), 'rb') as f:
+    #             best = pickle.load(f)
+    #             # length = min(len(best), length)
+    #             # length = len(best)
+    #             if len(best) > length:
+    #                 best = random.sample(best, length)
+    #         best_index = 0
+    #         fitness_list = []
+    #         while best_index < len(best):
+    #
+    #             class_index = np.arange(n_train)[dst_train.targets == c]
+    #
+    #
+    #             # best = np.load('test_data/multi_{}/best_{}_multi_{}.npy'.format(c, fraction, dataset))
+    #             # best_index = np.load('test_data/iter_File_{}/multi_{}/best_index_{}.npy'.format(iter, dataset, fraction))[0]
+    #             # best_index = best_index_dict[iter]
+    #             # best_i.init(best[best_index])
+    #             # print('best: ', best_i.fitness)
+    #             fitness_list.append(best[best_index].fitness)
+    #             best_index += 1
+    #
+    #         fitness_array = np.array(fitness_list)
+    #         print('label', c)
+    #         print('length', length)
+    #
+    #         hv_value = ind(fitness_array)
+    #         print("HV", hv_value)
+    #         hv_list.append(hv_value)
+    #     print('iter: ', iter)
+    #     average_hv = np.mean(np.array(hv_list))
+    #     print('average hv: ', average_hv)
+    #     average_hv_list.append(average_hv)
+    #     write_data['iter'].append(iter)
+    #     write_data['hv'].append(average_hv)
+    # print(average_hv_list)
+    # df = pds.DataFrame(write_data)
+    # path = 'criterion_data/hv_{}.xlsx'.format(fraction)
+    # # os.makedirs(path, exist_ok=True)
+    # df.to_excel(path, index=False)
+    # exit(0)
 
 
     calculators = []
-    for c in range(1):
+    total_gene = None
+    gene = None
+    for c in range(10):
         features_matrix = torch.load(
             os.path.join(folder, 'label_{}/features_matrix_{}_{}.pth'.format(c, fraction, dataset))).cpu()
         confidence = torch.load(os.path.join(folder, 'label_{}/importance_{}_{}.pth'.format(c, fraction, dataset)))
         size = round(features_matrix.shape[0] * fraction)
-
+        total_gene = features_matrix.shape[0]
+        gene = size
         fitness_calculators = [MMDCalculator(features_matrix, size, device='cuda'),
                                InfoCalculator(features_matrix, confidence, size, device='cuda')]
         calculators.append(fitness_calculators)
     for iter in best_index_dict.keys():
         best_index = 0
-        length = 20
+        length = 5
         while best_index < length:
             fitness_list = []
             for c in range(10):
                 class_index = np.arange(n_train)[dst_train.targets == c]
 
-                with open(os.path.join(folder, 'iter_{}_label_{}/best_solution.pkl'.format(iter, c)), 'rb') as f:
+                with open(os.path.join(folder, 'iter_{}_label_{}/best_results.pkl'.format(iter, c)), 'rb') as f:
                     best = pickle.load(f)
                     length = len(best)
                 # best = np.load('test_data/multi_{}/best_{}_multi_{}.npy'.format(c, fraction, dataset))
@@ -124,7 +139,7 @@ if __name__ == '__main__':
                 fitness_calculators = calculators[c]
 
                 Individual.fitness_calculators = fitness_calculators
-                best_i = Individual(features_matrix.shape[0], size, 2)
+                best_i = Individual(total_gene, gene, 2)
                 best_i.init(best[best_index])
                 # print('best: ', best_i.fitness)
                 fitness_list.append(best_i.fitness)

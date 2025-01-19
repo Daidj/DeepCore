@@ -627,9 +627,12 @@ class MOEA2(EarlyTrain):
             selection_results = [np.array([], dtype=np.int64) for i in range(self.args.solution_num)]
             scores = []
             for c in range(self.args.num_classes):
+                class_index = np.arange(self.n_train)[self.dst_train.targets == c]
+                if len(class_index) == 0:
+                    continue
                 test_data_folder = 'test_data/iter_{}/multi_{}'.format(self.args.iter, c)
                 os.makedirs(test_data_folder, exist_ok=True)
-                class_index = np.arange(self.n_train)[self.dst_train.targets == c]
+
                 features_matrix, confidence = self.construct_matrix(class_index)
                 # data = features_matrix.cpu().numpy()
                 # pca = PCA(n_components=1)

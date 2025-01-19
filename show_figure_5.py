@@ -45,7 +45,9 @@ if __name__ == '__main__':
         30: 1,
         40: 0,
         50: 0,
+        60: 0,
         70: 2,
+        80: 0,
         90: 1
     }
 
@@ -76,7 +78,10 @@ if __name__ == '__main__':
         fitness_array = np.array(fitness_list)
         IGDCalculators.append(IGD(fitness_array))
 
-
+    write_data = {
+        'iter': [],
+        'igd': [],
+    }
 
     average_igd_list = []
     for iter in best_index_dict.keys():
@@ -114,16 +119,15 @@ if __name__ == '__main__':
         average_igd = np.mean(np.array(igd_list))
         print('average igd: ', average_igd)
         average_igd_list.append(average_igd)
+        write_data['iter'].append(iter)
+        write_data['igd'].append(average_igd)
     print(average_igd_list)
 
-    write_data = {
-        'iter': [],
-        'igd': [],
-    }
+
 
     df = pds.DataFrame(write_data)
-    path = 'criterion_data/igd_{}'.format(fraction)
-    os.makedirs(path, exist_ok=True)
+    path = 'criterion_data/igd_{}.xlsx'.format(fraction)
+    # os.makedirs(path, exist_ok=True)
     df.to_excel(path, index=False)
 
     exit(0)

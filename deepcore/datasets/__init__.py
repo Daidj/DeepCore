@@ -14,3 +14,5 @@ from .yelp import *
 from .agnews import *
 from .us8k import *
 from .tinymnist import *
+from .subcifar100 import *
+from .Merge import *
