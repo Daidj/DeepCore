@@ -81,54 +81,54 @@ from random_remove_exp import test_model
 #     "--iter": 150
 # }
 
-# running_args = {
-#     "--dataset": "CIFAR100",
-#     "--model": "ResNet18",
-#     "--selection": "MOEAD",
-#     # "--num_exp": 20,
-#     "--num_exp": 2,
-#     "--num_eval": 1,
-#     # "--epochs": 2,
-#     "--epochs": 200,
-#     "--data_path": "data",
-#     "--gpu": 0,
-#     "--print_freq": 20,
-#     "--fraction": 0.7,
-#     "--workers": 4,
-#     "--optimizer": "Adam",
-#     "--lr": 0.002,
-#     "--momentum": 0.0,
-#     "--weight_decay": 0.0,
-#     "--nesterov": False,
-#     "--train_batch": 256,
-#     "--selection_batch": 256,
-#     "--test_interval": 1,
-#     "--selection_epochs": 25,
-#     "--selection_momentum": 0.0,
-#     "--selection_weight_decay": 0.0,
-#     "--selection_optimizer": "Adam",
-#     "--selection_lr": 0.002,
-#     "--selection_test_interval": 1,
-#     "--balance": True,
-#     "--population": 10,
-#     "--solution_num": 5,
-#     "--step_rate": 0.1,
-#     "--iter": 20
-# }
+running_args = {
+    "--dataset": "CIFAR100",
+    "--model": "ResNet18",
+    "--selection": "MOEAD",
+    # "--num_exp": 20,
+    "--num_exp": 1,
+    "--num_eval": 1,
+    # "--epochs": 2,
+    "--epochs": 200,
+    "--data_path": "data",
+    "--gpu": 0,
+    "--print_freq": 20,
+    "--fraction": 0.7,
+    "--workers": 4,
+    "--optimizer": "Adam",
+    "--lr": 0.002,
+    "--momentum": 0.0,
+    "--weight_decay": 0.0,
+    "--nesterov": False,
+    "--train_batch": 256,
+    "--selection_batch": 256,
+    "--test_interval": 1,
+    "--selection_epochs": 25,
+    "--selection_momentum": 0.0,
+    "--selection_weight_decay": 0.0,
+    "--selection_optimizer": "Adam",
+    "--selection_lr": 0.002,
+    "--selection_test_interval": 1,
+    "--balance": True,
+    "--population": 20,
+    "--solution_num": 5,
+    "--step_rate": 0.1,
+    "--iter": 100
+}
 
 # running_args = {
 #     "--dataset": "SST5",
 #     "--model": "TextCNN",
 #     "--selection": "MOEAD",
 #     # "--num_exp": 20,
-#     "--num_exp": 1,
+#     "--num_exp": 5,
 #     "--num_eval": 1,
 #     # "--epochs": 10,
 #     "--epochs": 100,
 #     "--data_path": "data",
 #     "--gpu": 0,
 #     "--print_freq": 20,
-#     "--fraction": 0.7,
+#     "--fraction": 0.1,
 #     "--workers": 8,
 #     "--optimizer": "Adam",
 #     "--lr": 0.002,
@@ -152,40 +152,40 @@ from random_remove_exp import test_model
 #     "--iter": 20
 # }
 
-running_args = {
-    "--dataset": "UrbanSound8K",
-    "--model": "TDNN",
-    "--selection": "MOEAD",
-    "--num_exp": 5,
-    # "--num_exp": 1,
-    "--num_eval": 1,
-    # "--epochs": 10,
-    "--epochs": 200,
-    "--data_path": "data",
-    "--gpu": 0,
-    "--print_freq": 20,
-    "--fraction": 0.1,
-    "--workers": 8,
-    "--optimizer": "Adam",
-    "--lr": 0.001,
-    "--momentum": 0.0,
-    "--weight_decay": 0.0,
-    "--nesterov": False,
-    "--train_batch": 64,
-    "--selection_batch": 64,
-    "--test_interval": 1,
-    "--selection_epochs": 25,
-    "--selection_momentum": 0.0,
-    "--selection_weight_decay": 0.0,
-    "--selection_optimizer": "Adam",
-    "--selection_lr": 0.001,
-    "--selection_test_interval": 1,
-    "--balance": True,
-    "--solution_num": 5,
-    "--population": 10,
-    "--step_rate": 0.1,
-    "--iter": 20
-}
+# running_args = {
+#     "--dataset": "UrbanSound8K",
+#     "--model": "TDNN",
+#     "--selection": "MOEAD",
+#     "--num_exp": 5,
+#     # "--num_exp": 1,
+#     "--num_eval": 1,
+#     # "--epochs": 10,
+#     "--epochs": 200,
+#     "--data_path": "data",
+#     "--gpu": 0,
+#     "--print_freq": 20,
+#     "--fraction": 0.1,
+#     "--workers": 8,
+#     "--optimizer": "Adam",
+#     "--lr": 0.001,
+#     "--momentum": 0.0,
+#     "--weight_decay": 0.0,
+#     "--nesterov": False,
+#     "--train_batch": 64,
+#     "--selection_batch": 64,
+#     "--test_interval": 1,
+#     "--selection_epochs": 25,
+#     "--selection_momentum": 0.0,
+#     "--selection_weight_decay": 0.0,
+#     "--selection_optimizer": "Adam",
+#     "--selection_lr": 0.001,
+#     "--selection_test_interval": 1,
+#     "--balance": True,
+#     "--solution_num": 5,
+#     "--population": 10,
+#     "--step_rate": 0.1,
+#     "--iter": 20
+# }
 
 # running_args = {
 #     "--dataset": "YELP",
@@ -306,12 +306,12 @@ if __name__ == '__main__':
     # wb.to_excel('./excel/data_MOEAD_70_1.xlsx')
     # wb.append('备注', 0, "MOEAD, fraction: 0.7, model: ResNet18, dataset: CIFAR10, MOEAD, last_layer, Info, ratio: 1.0, cosine, iter: 150, population: 20, step_rate: 0.1, mmd: 0.003")
     # wb.to_excel('./excel/data_MOEAD_70_2.xlsx')
-    # wb.append('备注', 0, "MOEAD, fraction: 0.7, model: ResNet18, dataset: CIFAR100, MOEAD, last_layer, Info, ratio: 1.0, cosine, iter: 150, population: 20, step_rate: 0.1, mmd: 0.003")
-    # wb.to_excel('./excel/data_MOEAD_70_3.xlsx')
-    # wb.append('备注', 0, "MOEAD, fraction: 0.7, model: TextCNN, dataset: SST-5.")
-    # wb.to_excel('./excel/data_MOEAD_70_4.xlsx')
-    wb.append('备注', 0, "MOEAD, fraction: 0.1, model: TDNN, dataset: US8k")
-    wb.to_excel('./excel/data_MOEAD_10_5.xlsx')
+    wb.append('备注', 0, "MOEAD, fraction: 0.7, model: ResNet18, dataset: CIFAR100, MOEAD, last_layer, Info, ratio: 1.0, cosine, iter: 150, population: 20, step_rate: 0.1, mmd: 0.003")
+    wb.to_excel('./excel/data_MOEAD_70_3.xlsx')
+    # wb.append('备注', 0, "MOEAD, fraction: 0.1, model: TextCNN, dataset: SST-5.")
+    # wb.to_excel('./excel/data_MOEAD_10_4.xlsx')
+    # wb.append('备注', 0, "MOEAD, fraction: 0.1, model: TDNN, dataset: US8k")
+    # wb.to_excel('./excel/data_MOEAD_10_5.xlsx')
     # wb.append('备注', 0, "MOEAD, fraction: 0.7, model: TextCNN, dataset: SST-5, ratio: 1.0, middle: 0.75")
     # wb.append('备注', 0, "MOEAD, fraction: 0.5, model: TextCNN, dataset: YELP, uniqueness+kcenter(一致的归一化), batch: 256, 比例优化空间, "
     #                    "0.5:0.5, 特征矩阵:outputs, 置信度：标签索引, iter: 50")

@@ -473,6 +473,14 @@ class MMDCalculator:
         scores = (scores - scores.min()) / (scores.max() - scores.min())
         return scores
 
+    def origin_unselected_fitness(self, individual):
+        scores = self.calculator.get_unselected_scores(individual.gene, individual.unselected_gene)
+        return scores
+
+    def origin_selected_fitness(self, individual):
+        scores = self.calculator.get_selected_scores(individual.gene, individual.unselected_gene)
+        return scores
+
     def set_min_fitness(self, fitness):
         self.min_fitness = fitness
 
@@ -668,6 +676,50 @@ class InfoCalculator:
 
         score = uncertainty - self.similarity_redundancy_ratio * redundancy_info
         score = (score - score.min()) / (score.max() - score.min())
+
+        # scores = 1 - (second_min_values - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        # scores = scores*0.8+0.1
+
+        return score
+
+    def origin_unselected_fitness(self, individual):
+        if self.gene_num <= self.min_num:
+            return torch.zeros(len(individual.unselected_gene))
+        selected_tensor = torch.tensor(list(individual.gene))
+        unselected_tensor = torch.tensor(list(individual.unselected_gene))
+
+        unselected_dis = self.distance[unselected_tensor, :][:, selected_tensor]
+        selected_dis = self.distance[selected_tensor, :][:, selected_tensor]
+        selected_min_dis = torch.kthvalue(selected_dis, 2, dim=1).values
+        result_tensor = -torch.where(unselected_dis > selected_min_dis, torch.tensor(0.0),
+                                     unselected_dis - selected_min_dis)
+        self_min_dis, _ = torch.min(unselected_dis, dim=1)
+
+        other_dis = torch.sum(result_tensor, dim=1)
+        redundancy_info = self_min_dis - other_dis
+        uncertainty = self.confidence[unselected_tensor]
+
+        score = uncertainty - self.similarity_redundancy_ratio * redundancy_info
+
+        return score
+
+    def origin_selected_fitness(self, individual):
+        if self.gene_num <= self.min_num:
+            return torch.zeros(len(individual.gene))
+        selected_tensor = torch.tensor(list(individual.gene))
+        unselected_tensor = torch.tensor(list(individual.unselected_gene))
+        unselected_dis = self.distance[unselected_tensor, :][:, selected_tensor]
+        selected_dis = self.distance[selected_tensor, :][:, selected_tensor]
+        selected_min_dis = torch.kthvalue(selected_dis, 2, dim=1).values
+        selected_bak_dis = torch.kthvalue(selected_dis, 3, dim=1).values
+
+        result_tensor = torch.where(selected_dis != selected_min_dis, torch.tensor(0.0),
+                                    selected_bak_dis - selected_dis)
+        other_dis = torch.sum(result_tensor, dim=1)
+        redundancy_info = (selected_min_dis - other_dis)
+        uncertainty = self.confidence[selected_tensor]
+
+        score = uncertainty - self.similarity_redundancy_ratio * redundancy_info
 
         # scores = 1 - (second_min_values - self.min_fitness) / (self.max_fitness - self.min_fitness)
         # scores = scores*0.8+0.1
