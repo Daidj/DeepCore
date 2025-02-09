@@ -414,7 +414,7 @@ class MOEADAlgorithm:
     def solve(self, iter=50, label=0):
         L = 10
         utility = np.ones((self.population_num, L))
-        process_data_folder = 'process_data'
+        process_data_folder = self.output_folder
         beta = min(self.target_num / 5, 0.4)
         for i in range(iter):
             print("Iter:", i)
@@ -494,7 +494,7 @@ class MOEADAlgorithm:
             subproblems_front = [p.fitness for p in self.best_population_for_subproblems]
             best = self.get_best_in_solution()
             self.last_best_index = best
-            if i % 10 == 0:
+            if i % 5 == 0:
                 self.update_best_solution()
                 best = self.get_best_in_solution()
                 self.last_best_index = best
@@ -603,7 +603,7 @@ class MOEAD(EarlyTrain):
             selection_results = [np.array([], dtype=np.int64) for i in range(self.args.solution_num)]
             scores = []
             for c in range(self.args.num_classes):
-                test_data_folder = 'process_data/label_{}'.format(c)
+                test_data_folder = 'process_data/{}_{}/'.format(self.args.dataset, self.fraction)
                 os.makedirs(test_data_folder, exist_ok=True)
                 class_index = np.arange(self.n_train)[self.dst_train.targets == c]
                 features_matrix, confidence = self.construct_matrix(class_index)

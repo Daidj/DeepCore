@@ -306,7 +306,7 @@ if __name__ == '__main__':
     # wb.to_excel('./excel/data_MOEAD_70_1.xlsx')
     # wb.append('备注', 0, "MOEAD, fraction: 0.7, model: ResNet18, dataset: CIFAR10, MOEAD, last_layer, Info, ratio: 1.0, cosine, iter: 150, population: 20, step_rate: 0.1, mmd: 0.003")
     # wb.to_excel('./excel/data_MOEAD_70_2.xlsx')
-    wb.append('备注', 0, "MOEAD, fraction: 0.7, model: ResNet18, dataset: CIFAR100, MOEAD, last_layer, Info, ratio: 1.0, cosine, iter: 150, population: 20, step_rate: 0.1, mmd: 0.003")
+    wb.append('备注', 0, "MOEAD, fraction: 0.7, model: ResNet18, dataset: CIFAR100, MOEAD, last_layer, Info, ratio: 1.0, cosine, iter: 150, population: 20, step_rate: 0.1, mmd: 0.003.")
     wb.to_excel('./excel/data_MOEAD_70_3.xlsx')
     # wb.append('备注', 0, "MOEAD, fraction: 0.1, model: TextCNN, dataset: SST-5.")
     # wb.to_excel('./excel/data_MOEAD_10_4.xlsx')
