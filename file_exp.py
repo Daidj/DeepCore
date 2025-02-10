@@ -228,7 +228,7 @@ running_args = {
     "--data_path": "data",
     "--gpu": 0,
     "--print_freq": 20,
-    "--fraction": 0.7,
+    "--fraction": 0.1,
     "--workers": 8,
     "--optimizer": "Adam",
     "--lr": 0.002,
@@ -280,10 +280,10 @@ if __name__ == '__main__':
         #                    "0.5:0.5, 特征矩阵:outputs, 置信度：标签索引, iter: 50")
         # wb.append('备注', 0, "File, fraction: 0.1, model: TextCNN, dataset: AG News, File, last_layer, Confidence, ratio: 1.0, middle: 动态,min_mmd_distance: 0.002, cosine")
         # wb.to_excel('./excel/data_File_10.xlsx')
-        wb.append('备注', 0, "File, fraction: 0.7, model: LeNet, dataset: TINYMNIST, last_layer, Info, ratio: 1.0, cosine, iter: 150, population: 20, step_rate: 0.1, mmd: 0.003")
-        wb.to_excel('./excel/data_File_70_i{}.xlsx'.format(iter))
+        wb.append('备注', 0, "File, fraction: 0.1, model: LeNet, dataset: TINYMNIST, last_layer, Info, ratio: 1.0, cosine, iter: 150, population: 20, step_rate: 0.1, mmd: 0.003")
+        wb.to_excel('./excel/data_File_10_i{}.xlsx'.format(iter))
 
         sys.argv = []
         sys.argv.append(origin_argv[0])
-        iter += 10
+        iter += 5
     print("end")

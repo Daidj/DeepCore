@@ -392,7 +392,7 @@ class MOEADAlgorithm:
         best_list = []
         step = 1.0 / (self.solution_num - 1)
         for i in range(self.solution_num):
-            fraction = [i * step, 1.0 - i * step]
+            fraction = [max(i * step, 0.00001), max(1.0 - i * step, 0.00001)]
             best_list.append(self.get_best_in_solution(fraction=fraction))
         return best_list
 

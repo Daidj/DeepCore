@@ -11,14 +11,14 @@ class File(CoresetMethod):
     def __init__(self, dst_train, args, fraction, random_seed, balance=False, **kwargs):
         super().__init__(dst_train, args, fraction, random_seed, **kwargs)
         self.balance = balance
-        self.root = 'process_data_{}'.format(round(self.args.fraction*100))
+        self.root = 'process_data/{}_{}/'.format(self.args.dataset, self.fraction)
 
     def finish_run(self):
         if self.balance:
             selection_results = [np.array([], dtype=np.int64) for i in range(self.args.solution_num)]
             for c in range(self.args.num_classes):
                 class_index = np.arange(self.n_train)[self.dst_train.targets == c]
-                file = os.path.join(self.root, 'iter_{}_label_{}/best_results'.format(self.args.iter, c))
+                file = os.path.join(self.root, 'iter_{}_label_{}/best_results.pkl'.format(self.args.iter, c))
                 with open(file, 'rb') as f:
                     best_results = pickle.load(f)
                 for i in range(len(best_results)):
