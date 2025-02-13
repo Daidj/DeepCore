@@ -37,7 +37,7 @@ def first_stage_search(matrix, budget: int, metric=None, device='cuda', search=T
         # print('mmd distance: {}'.format(mmd_distance))
         # print('mmd serach: {}'.format(stage_budget))
 
-        current_stage_budget = min(stage_budget, init_num)
+        current_stage_budget = max(1, min(stage_budget, init_num))
         while current_stage_budget > 0:
             selected_num = min(current_stage_budget, step)
             if len(selected) == 0:

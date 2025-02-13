@@ -21,8 +21,8 @@ def show_figure(data, index, save_folder='test_data/', type='selected', text='')
     # height, width = img.shape
 
     plt.axis('off')
-    plt.text(0.0, 0.0, '{}'.format(text),
-             ha='center', va='bottom', fontsize=14)
+    # plt.text(0.0, 0.0, '{}'.format(text),
+    #          ha='center', va='bottom', fontsize=14)
     folder = os.path.join(save_folder, '{}'.format(type))
     os.makedirs(folder, exist_ok=True)
     plt.savefig(os.path.join(folder, '{}.png'.format(index)))
@@ -33,7 +33,7 @@ def show_figure(data, index, save_folder='test_data/', type='selected', text='')
 if __name__ == '__main__':
     data_path = 'data'
 
-    dataset = 'TINYMNIST'
+    dataset = 'CIFAR100'
     channel, im_size, num_classes, class_names, mean, std, dst_train, dst_test = datasets.__dict__[dataset](data_path)
     n_train = len(dst_train)
     best = []
@@ -42,8 +42,8 @@ if __name__ == '__main__':
     fraction = 0.7
     data = dst_train.data
     targets = dst_train.targets
-    test_data_folder = '/home/sample_selection/test_data/'
-    folder = os.path.join(test_data_folder, 'iter_MOEAD_100/multi_{}'.format(dataset))
+    test_data_folder = 'test_data/'
+    folder = os.path.join(test_data_folder, 'iter_MOEA2_20/multi_{}'.format(dataset))
     best_file_path = os.path.join(folder, 'best_{}.npy'.format(fraction))
     all_best_result = np.load(best_file_path)
     best_index = np.load(os.path.join(folder, 'best_index_{}.npy'.format(fraction)))
@@ -57,9 +57,9 @@ if __name__ == '__main__':
     #
     #     calculators.append(fitness_calculators)
 
-    for c in range(0, 10):
+    for c in range(6, 7):
 
-        folder = os.path.join(test_data_folder, 'iter_100/ldea_{}'.format(c))
+        folder = os.path.join(test_data_folder, 'iter_20/multi_{}'.format(c))
         features_matrix = torch.load(
             os.path.join(folder, 'features_matrix_{}_{}.pth'.format(fraction, dataset))).cpu().numpy()
         confidence = torch.load(os.path.join(folder, 'importance_{}_{}.pth'.format(fraction, dataset)))

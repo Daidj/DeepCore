@@ -455,7 +455,10 @@ class MMDCalculator:
     def fitness(self, individual):
         selected = torch.tensor(list(individual.gene))
         fitness = self.calculator.mmd_for_data_set(selected)
-        normalization_fitness = (fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        if self.max_fitness == self.min_fitness:
+            normalization_fitness = fitness
+        else:
+            normalization_fitness = (fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
         return normalization_fitness, fitness
 
     def unselected_fitness(self, individual):
@@ -632,8 +635,10 @@ class InfoCalculator:
             fitness = torch.sum(scores).item()
             # 值越小说明解越好
             origin_fitness = (fitness - self.min_normalization_fitness) / (self.max_normalization_fitness - self.min_normalization_fitness)
-        normalization_fitness = (origin_fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
-
+        if self.max_fitness == self.min_fitness:
+            normalization_fitness = origin_fitness
+        else:
+            normalization_fitness = (origin_fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
         return normalization_fitness, origin_fitness
 
     def unselected_fitness(self, individual):

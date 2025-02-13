@@ -33,7 +33,7 @@ if __name__ == '__main__':
     n_train = len(dst_train)
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
               '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-    fraction = 0.5
+    fraction = 0.7
     plt.figure(figsize=(8, 6))
 
     color = 0
@@ -50,7 +50,7 @@ if __name__ == '__main__':
         90: 1
     }
 
-    folder = 'process_data_50'
+    folder = 'process_data/{}_{}/'.format(dataset, fraction)
     # folder = 'process_data'
     # length = 20
     # ref_point = [1.0, 1.0]
@@ -114,8 +114,8 @@ if __name__ == '__main__':
     gene = None
     for c in range(10):
         features_matrix = torch.load(
-            os.path.join(folder, 'label_{}/features_matrix_{}_{}.pth'.format(c, fraction, dataset))).cpu()
-        confidence = torch.load(os.path.join(folder, 'label_{}/importance_{}_{}.pth'.format(c, fraction, dataset)))
+            os.path.join(folder, 'features_matrix_{}.pth'.format(c))).cpu()
+        confidence = torch.load(os.path.join(folder, 'importance_{}.pth'.format(c)))
         size = round(features_matrix.shape[0] * fraction)
         total_gene = features_matrix.shape[0]
         gene = size
@@ -143,7 +143,6 @@ if __name__ == '__main__':
                 best_i.init(best[best_index])
                 # print('best: ', best_i.fitness)
                 fitness_list.append(best_i.fitness)
-                continue
             fitness_array = np.array(fitness_list)
             average_fitness = np.mean(fitness_array, axis=0)
             print('iter: ', iter)

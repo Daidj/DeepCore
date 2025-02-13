@@ -34,29 +34,18 @@ if __name__ == '__main__':
     n_train = len(dst_train)
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
               '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
-    fraction = 0.7
+    fraction = 0.1
     plt.figure(figsize=(8, 6))
 
     color = 0
-    best_index_dict = {
-        0: 0,
-        10: 2,
-        20: 0,
-        30: 1,
-        40: 0,
-        50: 0,
-        60: 0,
-        70: 2,
-        80: 0,
-        90: 1
-    }
 
-    folder = 'process_data_70'
+
+    folder = 'process_data/{}_{}/'.format(dataset, fraction)
     length = 20
     IGDCalculators = []
     ## 计算IGD指标
     for c in range(10):
-        with open(os.path.join(folder, 'iter_90_label_{}/best_solution'.format(c)), 'rb') as f:
+        with open(os.path.join(folder, 'iter_95_label_{}/best_solution.pkl'.format(c)), 'rb') as f:
             best = pickle.load(f)
             # length = min(len(best), length)
             # length = len(best)
@@ -84,10 +73,11 @@ if __name__ == '__main__':
     }
 
     average_igd_list = []
-    for iter in best_index_dict.keys():
+    iter = 0
+    while iter < 100:
         igd_list = []
         for c in range(10):
-            with open(os.path.join(folder, 'iter_{}_label_{}/best_solution'.format(iter, c)), 'rb') as f:
+            with open(os.path.join(folder, 'iter_{}_label_{}/best_solution.pkl'.format(iter, c)), 'rb') as f:
                 best = pickle.load(f)
                 # length = min(len(best), length)
                 # length = len(best)
@@ -121,6 +111,7 @@ if __name__ == '__main__':
         average_igd_list.append(average_igd)
         write_data['iter'].append(iter)
         write_data['igd'].append(average_igd)
+        iter += 5
     print(average_igd_list)
 
 
