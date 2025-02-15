@@ -402,7 +402,7 @@ class MODE2:
         if fraction is None:
             step = 1.0 / (self.solution_num - 1)
             first = random.randint(0, self.solution_num-1)
-            fraction = torch.tensor([first*step, 1.0-first*step])
+            fraction = torch.tensor([max(first*step, 1e-6), max(1.0-first*step, 1e-6)])
             print('fraction:', fraction)
         else:
             fraction = torch.tensor(fraction)
@@ -482,6 +482,12 @@ class MODE2:
                 new_population = [parent_1, parent_2, child_1, child_2, child_3, child_4]
                 new_population_subproblems = [selected_subproblem if i % 2 == 0 else neighboring for i in
                                               range(len(new_population))]
+                # current_best_list = self.get_multi_best_solution()
+                # for index in current_best_list:
+                #     new_population.append(self.best_solution[index].local_search(
+                #         self.subproblems.weight_vectors[self.best_solution_to_subproblem[index]]))
+                #     new_population_subproblems.append(self.best_solution_to_subproblem[index])
+
                 if opr % 5 == 0:
                     new_population.append(self.best_solution[self.last_best_index].local_search(
                         self.subproblems.weight_vectors[self.best_solution_to_subproblem[self.last_best_index]]))

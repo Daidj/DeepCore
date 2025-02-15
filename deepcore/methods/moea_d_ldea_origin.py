@@ -372,7 +372,7 @@ class MOEADAlgorithm:
         if fraction is None:
             step = 1.0 / (self.solution_num - 1)
             first = random.randint(0, self.solution_num-1)
-            fraction = torch.tensor([first*step, 1.0-first*step])
+            fraction = torch.tensor([max(first*step, 1e-6), max(1.0-first*step, 1e-6)])
             print('fraction:', fraction)
         else:
             fraction = torch.tensor(fraction)
