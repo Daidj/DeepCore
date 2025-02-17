@@ -44,7 +44,7 @@ if __name__ == '__main__':
     length = 20
     IGDCalculators = []
     ## 计算IGD指标
-    for c in range(10):
+    for c in range(num_classes):
         with open(os.path.join(folder, 'iter_95_label_{}/best_solution.pkl'.format(c)), 'rb') as f:
             best = pickle.load(f)
             # length = min(len(best), length)
@@ -76,7 +76,7 @@ if __name__ == '__main__':
     iter = 0
     while iter < 100:
         igd_list = []
-        for c in range(10):
+        for c in range(num_classes):
             with open(os.path.join(folder, 'iter_{}_label_{}/best_solution.pkl'.format(iter, c)), 'rb') as f:
                 best = pickle.load(f)
                 # length = min(len(best), length)

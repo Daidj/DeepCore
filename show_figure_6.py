@@ -24,7 +24,7 @@ from mmd_algorithm import MMD
 from pymoo.indicators.hv import HV
 
 
-def get_best_in_solution(best_solution, fraction=None):
+def get_best_in_solution(best_solution, fraction=None, selected=None):
     solution_num = 5
     if fraction is None:
         step = 1.0 / (solution_num - 1)
@@ -42,7 +42,15 @@ def get_best_in_solution(best_solution, fraction=None):
 
     fraction_matrix = fraction.unsqueeze(0).repeat(scores.size(0), 1)
     scores = torch.sum(scores * fraction_matrix, dim=1)
-    best = torch.argmin(scores)
+    if selected is None:
+        best = torch.argmin(scores)
+    else:
+        selected = set([i.item() for i in selected])
+        index = 0
+        sorted_list = torch.argsort(scores)
+        while index < len(scores) and sorted_list[index].item() in selected:
+            index += 1
+        best = sorted_list[index]
     return best
 
 
@@ -52,7 +60,7 @@ def get_multi_best_solution(best_solution):
     step = 1.0 / (solution_num - 1)
     for i in range(solution_num):
         fraction = [max(i * step, 0.00001), max(1.0 - i * step, 0.00001)]
-        best_list.append(get_best_in_solution(best_solution, fraction))
+        best_list.append(get_best_in_solution(best_solution, fraction, best_list))
     return best_list
 
 if __name__ == '__main__':
@@ -71,7 +79,18 @@ if __name__ == '__main__':
 
     folder = 'process_data/{}_{}/'.format(dataset, fraction)
     length = 20
-    ref_point = [1.0, 1.0]
+
+    ref_point = [0.3, 1.0] # TINYMNIST
+    #
+    # for c in range(num_classes):
+    #     with open(os.path.join(folder, 'iter_0_label_{}/best_solution.pkl'.format(c)), 'rb') as f:
+    #         best = pickle.load(f)
+    #     best_index = 0
+    #     fitness_list = []
+    #     while best_index < len(best):
+    #         ref_point[0] = max(ref_point[0], best[best_index].fitness[0])
+    #         ref_point[1] = max(ref_point[1], best[best_index].fitness[1])
+    #         best_index += 1
 
     ind = HV(ref_point=ref_point)
     average_hv_list = []
@@ -83,7 +102,7 @@ if __name__ == '__main__':
     while iter < 100:
         pf = []
         hv_list = []
-        for c in range(10):
+        for c in range(num_classes):
             with open(os.path.join(folder, 'iter_{}_label_{}/best_solution.pkl'.format(iter, c)), 'rb') as f:
                 best_solution = pickle.load(f)
                 # best_list = get_multi_best_solution(best_solution)
