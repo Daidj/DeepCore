@@ -488,7 +488,7 @@ class MMDCalculator:
         self.min_fitness = fitness
 
     def set_max_fitness(self, fitness):
-        self.max_fitness = max(1e-6, fitness)
+        self.max_fitness = fitness
 
     def get_best(self):
         return set(self.calculator.get_min_distance_index(self.gene_num, step_rate=0.12))
@@ -735,7 +735,7 @@ class InfoCalculator:
         self.min_fitness = fitness
 
     def set_max_fitness(self, fitness):
-        self.max_fitness = max(1e-6, fitness)
+        self.max_fitness = fitness
 
     def get_best(self):
         res_greedy = torch.from_numpy(

@@ -27,7 +27,7 @@ from pymoo.indicators.hv import HV
 if __name__ == '__main__':
     data_path = 'data'
 
-    dataset = 'TINYMNIST'
+    dataset = 'UrbanSound8K'
 
     channel, im_size, num_classes, class_names, mean, std, dst_train, dst_test = datasets.__dict__[dataset](data_path)
     n_train = len(dst_train)
@@ -50,78 +50,21 @@ if __name__ == '__main__':
         90: 1
     }
 
-    folder = 'process_data/{}_{}/'.format(dataset, fraction)
-    # folder = 'process_data'
-    # length = 20
-    # ref_point = [1.0, 1.0]
-    #
-    # ind = HV(ref_point=ref_point)
-    # average_hv_list = []
-    # write_data = {
-    #     'iter': [],
-    #     'hv': [],
-    # }
-    # for iter in best_index_dict.keys():
-    #
-    #
-    #     pf = []
-    #     hv_list = []
-    #     for c in range(10):
-    #         with open(os.path.join(folder, 'iter_{}_label_{}/best_solution.pkl'.format(iter, c)), 'rb') as f:
-    #             best = pickle.load(f)
-    #             # length = min(len(best), length)
-    #             # length = len(best)
-    #             if len(best) > length:
-    #                 best = random.sample(best, length)
-    #         best_index = 0
-    #         fitness_list = []
-    #         while best_index < len(best):
-    #
-    #             class_index = np.arange(n_train)[dst_train.targets == c]
-    #
-    #
-    #             # best = np.load('test_data/multi_{}/best_{}_multi_{}.npy'.format(c, fraction, dataset))
-    #             # best_index = np.load('test_data/iter_File_{}/multi_{}/best_index_{}.npy'.format(iter, dataset, fraction))[0]
-    #             # best_index = best_index_dict[iter]
-    #             # best_i.init(best[best_index])
-    #             # print('best: ', best_i.fitness)
-    #             fitness_list.append(best[best_index].fitness)
-    #             best_index += 1
-    #
-    #         fitness_array = np.array(fitness_list)
-    #         print('label', c)
-    #         print('length', length)
-    #
-    #         hv_value = ind(fitness_array)
-    #         print("HV", hv_value)
-    #         hv_list.append(hv_value)
-    #     print('iter: ', iter)
-    #     average_hv = np.mean(np.array(hv_list))
-    #     print('average hv: ', average_hv)
-    #     average_hv_list.append(average_hv)
-    #     write_data['iter'].append(iter)
-    #     write_data['hv'].append(average_hv)
-    # print(average_hv_list)
-    # df = pds.DataFrame(write_data)
-    # path = 'criterion_data/hv_{}.xlsx'.format(fraction)
-    # # os.makedirs(path, exist_ok=True)
-    # df.to_excel(path, index=False)
-    # exit(0)
-
-
+    folder = 'test_data/{}/iter_20/'.format(dataset)
     calculators = []
     total_gene = None
     gene = None
-    for c in range(10):
+    for c in range(num_classes):
         features_matrix = torch.load(
-            os.path.join(folder, 'features_matrix_{}.pth'.format(c))).cpu()
-        confidence = torch.load(os.path.join(folder, 'importance_{}.pth'.format(c)))
+            os.path.join(folder, 'multi_{}/features_matrix_{}_{}.pth'.format(c, fraction, dataset))).cpu()
+        confidence = torch.load(os.path.join(folder, 'multi_{}/importance_{}_{}.pth'.format(c, fraction, dataset)))
         size = round(features_matrix.shape[0] * fraction)
         total_gene = features_matrix.shape[0]
         gene = size
         fitness_calculators = [MMDCalculator(features_matrix, size, device='cuda'),
                                InfoCalculator(features_matrix, confidence, size, device='cuda')]
         calculators.append(fitness_calculators)
+    exit(0)
     for iter in best_index_dict.keys():
         best_index = 0
         length = 5

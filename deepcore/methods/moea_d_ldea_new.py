@@ -1,5 +1,6 @@
 import copy
 import os
+import pickle
 import time
 
 import matplotlib.pyplot as plt
@@ -117,6 +118,7 @@ class Individual:
     def local_search(self, weight_vector):
         print(self.fitness, " local search: ", weight_vector)
         self.step_rate = self.step_rate * 0.9
+        print('step_rate: ', self.step_rate)
         search_num = max(1, round(self.step_rate * self.gene_num))
         child = self.clone()
         child.__remove_worst(weight_vector, search_num)
@@ -552,6 +554,8 @@ class MODE2:
         plot_nested_list(fitness_front, diff=self.greedy_best_fitness_points, important_points=best_fitness_list,
                          title="final_pareto_{}".format(self.fraction), folder_name=self.output_folder)
         print("fitness front: ", len(fitness_front))
+        with open(os.path.join(self.output_folder, 'best_solution.pkl'), 'wb') as f:
+            pickle.dump(self.best_solution, f)
         return best_results, best_fitness_list, fitness_front
 
 
@@ -636,7 +640,7 @@ class MOEA2(EarlyTrain):
                 class_index = np.arange(self.n_train)[self.dst_train.targets == c]
                 if len(class_index) == 0:
                     continue
-                test_data_folder = 'test_data/iter_{}/multi_{}'.format(self.args.iter, c)
+                test_data_folder = 'test_data/{}_{}/iter_{}/multi_{}'.format(self.args.dataset, self.fraction, self.args.iter, c)
                 os.makedirs(test_data_folder, exist_ok=True)
 
                 features_matrix, confidence = self.construct_matrix(class_index)
@@ -669,19 +673,20 @@ class MOEA2(EarlyTrain):
                     selection_results[i] = np.append(selection_results[i], best_result)
 
 
-                best_file_path = os.path.join(test_data_folder, 'best_{}_multi_{}.npy'.format(self.fraction, self.args.dataset))
+                best_file_path = os.path.join(test_data_folder, 'best_multi.npy')
                 np.save(best_file_path, np.array(best_list))
-                np.save(os.path.join(test_data_folder, 'front_{}_multi_{}.npy'.format(self.fraction, self.args.dataset)), np.array(fitness_front))
+                np.save(os.path.join(test_data_folder, 'front_multi.npy'), np.array(fitness_front))
                 torch.save(features_matrix,
-                           os.path.join(test_data_folder, 'features_matrix_{}_{}.pth'.format(self.fraction, self.args.dataset)))
-                torch.save(confidence, os.path.join(test_data_folder, 'importance_{}_{}.pth'.format(self.fraction, self.args.dataset)))
+                           os.path.join(test_data_folder, 'features_matrix.pth'))
+                torch.save(confidence, os.path.join(test_data_folder, 'importance.pth'))
         else:
             selection_results = None
             # scores = self.rank_uncertainty()
             # selection_result = np.argsort(scores)[:self.coreset_size]
-        test_data_folder = 'test_data/iter_{}/multi_{}'.format(self.args.iter, self.args.dataset)
+        test_data_folder = 'test_data/{}_{}/iter_{}/final'.format(self.args.dataset, self.fraction,
+                                                                         self.args.iter)
         os.makedirs(test_data_folder, exist_ok=True)
-        best_file_path = os.path.join(test_data_folder, 'best_multi_{}.npy'.format(self.fraction))
+        best_file_path = os.path.join(test_data_folder, 'best_multi.npy')
         np.save(best_file_path, selection_results)
 
         return [{'indices': result} for result in selection_results]
