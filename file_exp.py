@@ -116,38 +116,38 @@ from random_remove_exp import test_model
 #     "--iter": 150
 # }
 
-# running_args = {
-#     "--dataset": "SST5",
-#     "--model": "TextCNN",
-#     "--selection": "File",
-#     # "--num_exp": 20,
-#     "--num_exp": 1,
-#     "--num_eval": 1,
-#     # "--epochs": 10,
-#     "--epochs": 100,
-#     "--data_path": "data",
-#     "--gpu": 0,
-#     "--print_freq": 20,
-#     "--fraction": 0.7,
-#     "--workers": 8,
-#     "--optimizer": "Adam",
-#     "--lr": 0.002,
-#     "--momentum": 0.0,
-#     "--weight_decay": 0.0,
-#     "--nesterov": False,
-#     "--train_batch": 256,
-#     "--selection_batch": 256,
-#     "--test_interval": 1,
-#     "--selection_epochs": 25,
-#     # "--selection_epochs": 2,
-#     "--selection_momentum": 0.0,
-#     "--selection_weight_decay": 0.0,
-#     "--selection_optimizer": "Adam",
-#     "--selection_lr": 0.002,
-#     "--selection_test_interval": 1,
-#     "--balance": True
-#     "--solution_num": 5
-# }
+running_args = {
+    "--dataset": "SST5",
+    "--model": "TextCNN",
+    "--selection": "File",
+    # "--num_exp": 20,
+    "--num_exp": 5,
+    "--num_eval": 1,
+    # "--epochs": 10,
+    "--epochs": 100,
+    "--data_path": "data",
+    "--gpu": 0,
+    "--print_freq": 20,
+    "--fraction": 0.7,
+    "--workers": 8,
+    "--optimizer": "Adam",
+    "--lr": 0.002,
+    "--momentum": 0.0,
+    "--weight_decay": 0.0,
+    "--nesterov": False,
+    "--train_batch": 256,
+    "--selection_batch": 256,
+    "--test_interval": 1,
+    "--selection_epochs": 25,
+    # "--selection_epochs": 2,
+    "--selection_momentum": 0.0,
+    "--selection_weight_decay": 0.0,
+    "--selection_optimizer": "Adam",
+    "--selection_lr": 0.002,
+    "--selection_test_interval": 1,
+    "--balance": True,
+    "--solution_num": 5
+}
 
 # running_args = {
 #     "--dataset": "YELP",
@@ -216,44 +216,44 @@ from random_remove_exp import test_model
 #     "--solution_num": 5
 # }
 
-running_args = {
-    "--dataset": "TINYMNIST",
-    "--model": "LeNet",
-    "--selection": "File",
-    # "--num_exp": 1,
-    "--num_exp": 5,
-    "--num_eval": 1,
-    # "--epochs": 2,
-    "--epochs": 50,
-    "--data_path": "data",
-    "--gpu": 0,
-    "--print_freq": 20,
-    "--fraction": 0.1,
-    "--workers": 8,
-    "--optimizer": "Adam",
-    "--lr": 0.002,
-    "--momentum": 0.0,
-    "--weight_decay": 0.0,
-    "--nesterov": False,
-    "--train_batch": 32,
-    "--selection_batch": 32,
-    "--test_interval": 1,
-    "--selection_epochs": 6,
-    # "--selection_epochs": 2,
-    "--selection_momentum": 0.0,
-    "--selection_weight_decay": 0.0,
-    "--selection_optimizer": "Adam",
-    "--selection_lr": 0.002,
-    "--selection_test_interval": 1,
-    "--balance": True,
-    "--solution_num": 5,
-    "--population": 20,
-    "--step_rate": 0.1,
-    "--iter": 0
-}
+# running_args = {
+#     "--dataset": "TINYMNIST",
+#     "--model": "LeNet",
+#     "--selection": "File",
+#     # "--num_exp": 1,
+#     "--num_exp": 5,
+#     "--num_eval": 1,
+#     # "--epochs": 2,
+#     "--epochs": 50,
+#     "--data_path": "data",
+#     "--gpu": 0,
+#     "--print_freq": 20,
+#     "--fraction": 0.1,
+#     "--workers": 8,
+#     "--optimizer": "Adam",
+#     "--lr": 0.002,
+#     "--momentum": 0.0,
+#     "--weight_decay": 0.0,
+#     "--nesterov": False,
+#     "--train_batch": 32,
+#     "--selection_batch": 32,
+#     "--test_interval": 1,
+#     "--selection_epochs": 6,
+#     # "--selection_epochs": 2,
+#     "--selection_momentum": 0.0,
+#     "--selection_weight_decay": 0.0,
+#     "--selection_optimizer": "Adam",
+#     "--selection_lr": 0.002,
+#     "--selection_test_interval": 1,
+#     "--balance": True,
+#     "--solution_num": 5,
+#     "--population": 20,
+#     "--step_rate": 0.1,
+#     "--iter": 0
+# }
 
 if __name__ == '__main__':
-    iter = 0
+    iter = 75
     origin_argv = sys.argv
     print(sys.argv)
     while iter < 100:
@@ -273,15 +273,14 @@ if __name__ == '__main__':
         # wb.to_excel('./excel/data_File_70_2.xlsx')
         # wb.append('备注', 0, "File, fraction: 0.1, model: ResNet18, dataset: CIFAR100, File, last_layer, Info, ratio: 1.0, cosine, iter: 150, population: 20, step_rate: 0.1, mmd: 0.003")
         # wb.to_excel('./excel/data_File_10_3.xlsx')
-        # wb.append('备注', 0, "File, fraction: 0.1, model: TextCNN, dataset: SST-5, uniqueness+kcenter(一致的归一化), batch: 256, 比例优化空间, "
-        #                    "0.5:0.5, 特征矩阵:outputs, 置信度：标签索引, iter: 50")
+        wb.append('备注', 0, "File, fraction: 0.7, model: TextCNN, dataset: SST-5")
         # wb.append('备注', 0, "File, fraction: 0.7, model: TextCNN, dataset: SST-5, ratio: 1.0, middle: 0.75")
         # wb.append('备注', 0, "File, fraction: 0.5, model: TextCNN, dataset: YELP, uniqueness+kcenter(一致的归一化), batch: 256, 比例优化空间, "
         #                    "0.5:0.5, 特征矩阵:outputs, 置信度：标签索引, iter: 50")
         # wb.append('备注', 0, "File, fraction: 0.1, model: TextCNN, dataset: AG News, File, last_layer, Confidence, ratio: 1.0, middle: 动态,min_mmd_distance: 0.002, cosine")
         # wb.to_excel('./excel/data_File_10.xlsx')
-        wb.append('备注', 0, "File, fraction: 0.1, model: LeNet, dataset: TINYMNIST, last_layer, Info, ratio: 1.0, cosine, iter: 150, population: 20, step_rate: 0.1, mmd: 0.003")
-        wb.to_excel('./excel/data_File_10_i{}.xlsx'.format(iter))
+        # wb.append('备注', 0, "File, fraction: 0.1, model: LeNet, dataset: TINYMNIST, last_layer, Info, ratio: 1.0, cosine, iter: 100, population: 20, step_rate: 0.1, mmd: 0.003")
+        wb.to_excel('./excel/data_File_70_i{}.xlsx'.format(iter))
 
         sys.argv = []
         sys.argv.append(origin_argv[0])

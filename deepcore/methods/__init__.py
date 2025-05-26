@@ -29,7 +29,7 @@ from .fdmat import *
 from .single_objective_optimization import *
 from .kcenter_uncertainty import *
 from .micro import *
-from .micro_search import *
+from .micro_search_algorithm import *
 from .two_stage_search import *
 from .micro_glister import *
 from .self_adaptation_search import *
@@ -39,4 +39,5 @@ from .moea_d_ldea_origin import *
 from .file import *
 from .moead_decompose import *
 from .moead_search import *
+from .nsga2 import *
 

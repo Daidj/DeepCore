@@ -158,6 +158,7 @@ class kCenterGreedy(EarlyTrain):
         self.run()
         if self.balance:
             selection_result = np.array([], dtype=np.int32)
+            # for c in self.dst_train.step_class:
             for c in range(self.args.num_classes):
                 class_index = np.arange(self.n_train)[self.dst_train.targets == c]
 

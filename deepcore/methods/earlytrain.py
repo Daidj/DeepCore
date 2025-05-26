@@ -97,6 +97,11 @@ class EarlyTrain(CoresetMethod):
         np.random.seed(self.random_seed)
         self.train_indx = np.arange(self.n_train)
 
+        if self.args.device == "cpu":
+            print("Using CPU.")
+        elif self.args.gpu is not None:
+            torch.cuda.set_device(self.args.gpu[0])
+
         # Setup model and loss
         if self.args.model == 'TextCNN':
             n_vocal = self.dst_train.n_vocab

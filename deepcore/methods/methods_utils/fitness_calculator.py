@@ -490,6 +490,13 @@ class MMDCalculator:
     def set_max_fitness(self, fitness):
         self.max_fitness = fitness
 
+    def update_fitness(self, origin_fitness):
+        if self.max_fitness == self.min_fitness:
+            normalization_fitness = origin_fitness
+        else:
+            normalization_fitness = (origin_fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        return normalization_fitness
+
     def get_best(self):
         return set(self.calculator.get_min_distance_index(self.gene_num, step_rate=0.12))
 
@@ -640,6 +647,13 @@ class InfoCalculator:
         else:
             normalization_fitness = (origin_fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
         return normalization_fitness, origin_fitness
+
+    def update_fitness(self, origin_fitness):
+        if self.max_fitness == self.min_fitness:
+            normalization_fitness = origin_fitness
+        else:
+            normalization_fitness = (origin_fitness - self.min_fitness) / (self.max_fitness - self.min_fitness)
+        return normalization_fitness
 
     def unselected_fitness(self, individual):
         if self.gene_num <= self.min_num:
