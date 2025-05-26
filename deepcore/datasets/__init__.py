@@ -16,3 +16,5 @@ from .us8k import *
 from .tinymnist import *
 from .subcifar100 import *
 from .Merge import *
+from .newsgroup import *
+from .esc50 import *

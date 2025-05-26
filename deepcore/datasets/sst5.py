@@ -53,7 +53,7 @@ class SST5DataSet(Dataset):
 
         all_texts = []
         for data in sentences_list:
-            words = str(data).split(' ')
+            words = nltk.word_tokenize(str(data))
             words = words[:self.max_len]
             text_idx = [self.word_2_index.get(i, 0) for i in words]
             text_idx = text_idx + [1] * (self.max_len - len(words))

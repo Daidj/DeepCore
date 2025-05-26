@@ -108,6 +108,7 @@ class Individual:
         child.gene.add(new_gene)
         child.unselected_gene.remove(new_gene)
         child.unselected_gene.add(remove_gene)
+        # child.step_rate = 0.1
         child.set_fitness()
         return child
 
@@ -118,12 +119,24 @@ class Individual:
 
     def local_search(self, weight_vector):
         print(self.fitness, " local search: ", weight_vector)
-        self.step_rate = self.step_rate * 0.9
-        print('step_rate: ', self.step_rate)
-        search_num = max(1, round(self.step_rate * self.gene_num))
+        # self.step_rate = self.step_rate * 0.9
+        # print('step_rate: ', self.step_rate)
+        search_num = max(10, round(self.step_rate * self.gene_num))
         child = self.clone()
-        child.__remove_worst(weight_vector, search_num)
-        child.__greedy_search(weight_vector, search_num)
+        # last = self.clone()
+
+        for i in range(search_num):
+
+            remove_set = child.__remove_worst(weight_vector, 1)
+            add_set = child.__greedy_search(weight_vector, 1)
+            if remove_set == add_set:
+                print("search same")
+                break
+            else:
+                print("search greedy")
+        if self.all_equal(child):
+            return self.local_search_random(weight_vector)
+
         child.set_fitness()
         if child < self:
             print("search better")
@@ -135,18 +148,30 @@ class Individual:
 
     def local_search_random(self, weight_vector):
         print(self.fitness, " local search: ")
-        self.step_rate = self.step_rate * 0.9
+        # self.step_rate = self.step_rate * 0.9
 
-        search_num = max(1, round(self.step_rate * self.gene_num))
+        search_num = max(10, round(self.step_rate * self.gene_num))
         child = self.clone()
-        remove_gene = set(random.sample(list(self.gene), search_num))
+        remove_gene = set(random.sample(list(self.gene), 1))
         child.gene = child.gene - remove_gene
         child.unselected_gene.update(remove_gene)
-        child.__greedy_search(weight_vector, search_num)
+        child.__greedy_search(weight_vector, 1)
+
+        for i in range(search_num):
+
+            remove_set = child.__remove_worst(weight_vector, 1)
+            add_set = child.__greedy_search(weight_vector, 1)
+            if remove_set == add_set:
+                print("random search same")
+                break
+            else:
+                print("random search greedy")
+
         if self.all_equal(child):
-            print("search all equal")
+            print("still search all equal")
             return self.mutation()
         child.set_fitness()
+
         if child < self:
             print("search better")
         elif child > self:
@@ -165,6 +190,7 @@ class Individual:
         selected = set([l[i] for i in indices])
         self.gene.difference_update(selected)
         self.unselected_gene.update(selected)
+        return selected
 
     def __remove_worst_single(self, weight_vector):
         score_array = torch.stack([c.selected_fitness(self).float() for c in self.fitness_calculators], dim=0).to(
@@ -181,7 +207,7 @@ class Individual:
             selected = set(random.sample(list(self.unselected_gene), num))
             self.gene.update(selected)
             self.unselected_gene.difference_update(selected)
-            return
+            return selected
         score_array = torch.stack([c.unselected_fitness(self).float() for c in self.fitness_calculators], dim=0).to(
             self.device)
         res = torch.matmul(score_array.T, weight_vector.unsqueeze(1))
@@ -191,6 +217,7 @@ class Individual:
         selected = set([l[i] for i in indices])
         self.gene.update(selected)
         self.unselected_gene.difference_update(selected)
+        return selected
 
     def __greedy_search_old(self, weight_vector, num):
 
@@ -334,7 +361,7 @@ class SubProblems:
         # print(self.regions)
 
 
-class MODE2:
+class MicroSearchAlg:
     def __init__(self, fitness_calculators: list, total_gene_num: int, budget: int, device, population_num=20,
                  output_folder='test_data', solution_num=5, step_rate=0.01):
         self.population_num = population_num
@@ -507,13 +534,13 @@ class MODE2:
                 neighboring = random.choice(list(self.subproblems.neighbors[selected_subproblem]))
                 parent_2 = self.best_population_for_subproblems[neighboring]
                 child_1, child_2 = parent_1.crossover(parent_2)
-                child_3 = parent_1.mutation()
-                child_4 = parent_2.mutation()
+                # child_3 = parent_1.mutation()
+                # child_4 = parent_2.mutation()
                 # child_5 = parent_1.local_search(self.subproblems.weight_vectors[selected_subproblem])
                 # child_6 = parent_2.local_search(self.subproblems.weight_vectors[neighboring])
                 # new_population = [parent_1, parent_2, child_1, child_2, child_3, child_4, child_5, child_6]
-                # new_population = [parent_1, parent_2]
-                new_population = [parent_1, parent_2, child_1, child_2, child_3, child_4]
+                new_population = [parent_1, parent_2, child_1, child_2]
+                # new_population = [parent_1, parent_2, child_1, child_2, child_3, child_4]
                 new_population_subproblems = [selected_subproblem if i % 2 == 0 else neighboring for i in
                                               range(len(new_population))]
                 # current_best_list = self.get_multi_best_solution()
@@ -521,17 +548,17 @@ class MODE2:
                 #     new_population.append(self.best_solution[index].local_search(
                 #         self.subproblems.weight_vectors[self.best_solution_to_subproblem[index]]))
                 #     new_population_subproblems.append(self.best_solution_to_subproblem[index])
-                # new_population.append(parent_1.local_search(
-                #     self.subproblems.weight_vectors[selected_subproblem]))
-                # new_population_subproblems.append(selected_subproblem)
-                # new_population.append(parent_2.local_search(
-                #     self.subproblems.weight_vectors[neighboring]))
-                # new_population_subproblems.append(neighboring)
+                new_population.append(parent_1.local_search(
+                    self.subproblems.weight_vectors[selected_subproblem]))
+                new_population_subproblems.append(selected_subproblem)
+                new_population.append(parent_2.local_search(
+                    self.subproblems.weight_vectors[neighboring]))
+                new_population_subproblems.append(neighboring)
 
-                if opr % 5 == 0:
-                    new_population.append(self.best_solution[self.last_best_index].local_search(
-                        self.subproblems.weight_vectors[self.best_solution_to_subproblem[self.last_best_index]]))
-                    new_population_subproblems.append(self.best_solution_to_subproblem[self.last_best_index])
+                # if opr % 5 == 0:
+                #     new_population.append(self.best_solution[self.last_best_index].local_search(
+                #         self.subproblems.weight_vectors[self.best_solution_to_subproblem[self.last_best_index]]))
+                #     new_population_subproblems.append(self.best_solution_to_subproblem[self.last_best_index])
                     # last_best = random.choice(self.get_multi_best_solution())
                     # new_population.append(last_best.local_search(
                     #     self.subproblems.weight_vectors[self.best_solution_to_subproblem[self.last_best_index]]))
@@ -550,6 +577,9 @@ class MODE2:
                     nondeminated = True
                     replaced = False
                     for k in range(len(self.best_solution)):
+                        if current.all_equal(self.best_solution[k]):
+                            nondeminated = False
+                            break
                         if current > self.best_solution[k]:
                             nondeminated = False
                             break
@@ -568,26 +598,26 @@ class MODE2:
                         utility[selected_subproblem][i % L] = utility[selected_subproblem][i % L] + 1
             # if i % 5 == 4:
             #     self.update_best_solution()
-            fitness_front = [p.fitness for p in self.best_solution]
-            subproblems_front = [p.fitness for p in self.best_population_for_subproblems]
+            fitness_front = [p.origin_fitness for p in self.best_solution]
+            subproblems_front = [p.origin_fitness for p in self.best_population_for_subproblems]
             best = self.get_best_in_solution()
             self.last_best_index = best
             self.update_search_weight()
             if i % 10 == 0:
                 plot_nested_list(subproblems_front, diff=self.greedy_best_fitness_points,
                                  title="Iter_subproblems_{}_{}".format(self.fraction, i),
-                                 important_points=[self.best_solution[best].fitness], folder_name=self.output_folder)
+                                 important_points=[self.best_solution[best].origin_fitness], folder_name=self.output_folder)
                 plot_nested_list(fitness_front, diff=self.greedy_best_fitness_points, title="Iter_pareto_{}_{}".format(self.fraction,i),
-                                 important_points=[self.best_solution[best].fitness], folder_name=self.output_folder)
+                                 important_points=[self.best_solution[best].origin_fitness], folder_name=self.output_folder)
 
         print('subprobleam: ', subproblem_count)
 
         self.update_best_solution()
         # 对帕累托前沿的点进行评分并选择最优解
         best_list = self.get_multi_best_solution()
-        fitness_front = [p.fitness for p in self.best_solution]
+        fitness_front = [p.origin_fitness for p in self.best_solution]
         best_results = [list(self.best_solution[b].gene) for b in best_list]
-        best_fitness_list = [self.best_solution[b].fitness for b in best_list]
+        best_fitness_list = [self.best_solution[b].origin_fitness for b in best_list]
         print("best fitness: ", best_fitness_list)
         plot_nested_list(fitness_front, diff=self.greedy_best_fitness_points, important_points=best_fitness_list,
                          title="final_pareto_{}".format(self.fraction), folder_name=self.output_folder)
@@ -597,7 +627,7 @@ class MODE2:
         return best_results, best_fitness_list, fitness_front
 
 
-class MOEA2(EarlyTrain):
+class MicroSearch(EarlyTrain):
     def __init__(self, dst_train, args, fraction=0.5, random_seed=None, epochs=200, selection_method="Info",
                  specific_model=None, balance=False, **kwargs):
         super().__init__(dst_train, args, fraction, random_seed, epochs, specific_model, **kwargs)
@@ -678,7 +708,7 @@ class MOEA2(EarlyTrain):
                 class_index = np.arange(self.n_train)[self.dst_train.targets == c]
                 if len(class_index) == 0:
                     continue
-                test_data_folder = 'test_data/{}_{}/iter_{}/multi_{}'.format(self.args.dataset, self.fraction, self.args.iter, c)
+                test_data_folder = 'alg_data/{}_{}/iter_{}/multi_{}'.format(self.args.dataset, self.fraction, self.args.iter, c)
                 os.makedirs(test_data_folder, exist_ok=True)
 
                 features_matrix, confidence = self.construct_matrix(class_index)
@@ -700,7 +730,7 @@ class MOEA2(EarlyTrain):
                 #                        MMDCalculator(features_matrix, size, device='cuda')]
                 # fitness_calculators = [UniquenessCalculator(confidence, size, device='cuda'),
                 #                        DiversityCalculator(features_matrix, size, device='cuda')]
-                solver = MODE2(fitness_calculators=fitness_calculators, total_gene_num=len(class_index), budget=size,
+                solver = MicroSearchAlg(fitness_calculators=fitness_calculators, total_gene_num=len(class_index), budget=size,
                                device='cuda',
                                population_num=self.args.population, output_folder=test_data_folder, solution_num=self.args.solution_num, step_rate=self.args.step_rate)
                 best_list, best_fitness, fitness_front = solver.solve(iter=self.args.iter)
@@ -721,7 +751,7 @@ class MOEA2(EarlyTrain):
             selection_results = None
             # scores = self.rank_uncertainty()
             # selection_result = np.argsort(scores)[:self.coreset_size]
-        test_data_folder = 'test_data/{}_{}/iter_{}/final'.format(self.args.dataset, self.fraction,
+        test_data_folder = 'alg_data/{}_{}/iter_{}/final'.format(self.args.dataset, self.fraction,
                                                                          self.args.iter)
         os.makedirs(test_data_folder, exist_ok=True)
         best_file_path = os.path.join(test_data_folder, 'best_multi.npy')

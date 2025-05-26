@@ -13,7 +13,7 @@ from torchvision import transforms
 from utils import *
 from datetime import datetime
 
-def continual_learning(wb=None):
+def continual_learning_for_single_objective(wb=None):
 
 
     parser = argparse.ArgumentParser(description='Parameter Processing')
@@ -141,124 +141,9 @@ def continual_learning(wb=None):
                                       function=args.submodular
                                       )
             method = methods.__dict__[args.selection](dst_train, args, args.fraction, args.seed, **selection_args)
-            subsets = method.select()
-            algorithm_end_time = time.time()
-            global_best_prec1 = 0.0
-            global_best_index = 0
+            subset = method.select()
 
-            for solution in range(len(subsets)):
-                subset = subsets[solution]
-                selected_length = len(subset["indices"])
-                print("selected length: ", selected_length)
-
-                # Augmentation
-                dst_train.transform = transforms.Compose(
-                    [transforms.RandomCrop(args.im_size, padding=4, padding_mode="reflect"),
-                     transforms.RandomHorizontalFlip(), dst_train.transform])
-
-                dst_subset = torch.utils.data.Subset(dst_train, subset["indices"])
-
-                train_loader = torch.utils.data.DataLoader(dst_subset, batch_size=args.train_batch, shuffle=True,
-                                                           num_workers=args.workers, pin_memory=True)
-                test_loader = torch.utils.data.DataLoader(dst_test, batch_size=args.train_batch, shuffle=False,
-                                                          num_workers=args.workers, pin_memory=True)
-
-                # Listing cross-architecture experiment settings if specified.
-                model = args.model
-
-                network = nets.__dict__[model](channel, num_classes, im_size, pretrained=False).to(args.device)
-
-                if args.device == "cpu":
-                    print("Using CPU.")
-                elif args.gpu is not None:
-                    print("Using GPU {}".format(args.gpu[0]))
-                    torch.cuda.set_device(args.gpu[0])
-                    network = nets.nets_utils.MyDataParallel(network, device_ids=args.gpu)
-                elif torch.cuda.device_count() > 1:
-                    network = nets.nets_utils.MyDataParallel(network).cuda()
-
-                criterion = nn.CrossEntropyLoss(reduction='none').to(args.device)
-
-                # Optimizer
-                if args.optimizer == "SGD":
-                    optimizer = torch.optim.SGD(network.parameters(), args.lr, momentum=args.momentum,
-                                                weight_decay=args.weight_decay, nesterov=args.nesterov)
-                elif args.optimizer == "Adam":
-                    optimizer = torch.optim.Adam(network.parameters(), args.lr, weight_decay=args.weight_decay)
-                else:
-                    optimizer = torch.optim.__dict__[args.optimizer](network.parameters(), args.lr, momentum=args.momentum,
-                                                                     weight_decay=args.weight_decay, nesterov=args.nesterov)
-
-                # LR scheduler
-                if args.scheduler == "CosineAnnealingLR":
-                    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, len(train_loader) * args.epochs,
-                                                                           eta_min=args.min_lr)
-                elif args.scheduler == "StepLR":
-                    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=len(train_loader) * args.step_size,
-                                                                gamma=args.gamma)
-                else:
-                    scheduler = torch.optim.lr_scheduler.__dict__[args.scheduler](optimizer)
-                scheduler.last_epoch = (start_epoch - 1) * len(train_loader)
-
-                # Log recorder
-                rec = init_recorder()
-
-                best_prec1 = 0.0
-                best_epoch = -1
-
-                for epoch in range(start_epoch, args.epochs):
-                    # train for one epoch
-                    start_time = time.time()
-                    train(train_loader, network, criterion, optimizer, scheduler, epoch, args, rec, if_weighted=False)
-                    end_time = time.time()
-                    print("Train time: {}".format(end_time-start_time))
-
-                    # evaluate on validation set
-                    if args.test_interval > 0 and (epoch + 1) % args.test_interval == 0:
-                        prec1 = test(test_loader, network, criterion, epoch, args, rec)
-
-                        # remember best prec@1 and save checkpoint
-                        is_best = prec1 > best_prec1
-
-                        if is_best:
-                            best_prec1 = prec1
-                            best_epoch = epoch
-
-                print('| Best accuracy: ', best_prec1, "\nBest epoch: ", best_epoch, " on model " + model, end="\n\n")
-
-                start_epoch = 0
-                checkpoint = {}
-                # visdom
-                epoch_list =[i for i in range(start_epoch, args.epochs)]
-                vis.line(Y=rec.train_loss, X=epoch_list, win='train_loss_{}_{}'.format(exp, solution), opts = dict(title='train_loss_{}_{}'.format(exp, solution), showlegend=True))
-                vis.line(Y=rec.train_acc, X=epoch_list, win='train_acc_{}_{}'.format(exp, solution), opts=dict(title='train_acc_{}_{}'.format(exp, solution), showlegend=True))
-                vis.line(Y=rec.lr, X=epoch_list, win='train_lr_{}_{}'.format(exp, solution),
-                         opts=dict(title='train_lr_{}_{}'.format(exp, solution), showlegend=True))
-                vis.line(Y=rec.test_loss, X=epoch_list, win='test_loss_{}_{}'.format(exp, solution),
-                         opts=dict(title='test_loss_{}_{}'.format(exp, solution), showlegend=True))
-                vis.line(Y=rec.test_acc, X=epoch_list, win='test_acc_{}_{}'.format(exp, solution),
-                         opts=dict(title='test_acc_{}_{}'.format(exp, solution), showlegend=True))
-                vis.text("Exp {} Solution {} result: Best accuracy: {}, Best epoch: {} \n".format(exp, solution, best_prec1, best_epoch), win='result', append=False if exp + solution == 0 else True)
-                if wb != None:
-                    wb.append('solution_{}'.format(solution), exp, best_prec1)
-                if best_prec1 > global_best_prec1:
-                    global_best_prec1 = best_prec1
-                    global_best_index = solution
-                    # test_data_folder = 'test_data/iter_{}_{}/multi_{}'.format(args.selection, args.iter, args.dataset)
-                    # os.makedirs(test_data_folder, exist_ok=True)
-                    # best_file_path = os.path.join(test_data_folder, 'best_{}.npy'.format(args.fraction))
-                    # best_index_path = os.path.join(test_data_folder, 'best_index_{}.npy'.format(args.fraction))
-                    # numpy.save(best_file_path, subset["indices"])
-                    # numpy.save(best_index_path, numpy.array([solution]))
-            exp_end_time = time.time()
-            vis.text("Exp {} result: Best accuracy: {}, Best index: {} \n".format(exp, global_best_prec1, global_best_index), win='result', append=True)
-
-            if wb != None:
-                wb.append('样本数量', exp, selected_length)
-                wb.append('总时间', exp, exp_end_time - exp_start_time)
-                wb.append('准确度', exp, global_best_prec1)
-                wb.append('算法时间', exp, algorithm_end_time - algorithm_start_time)
-            final_subset.append(subsets[global_best_index]["indices"])
+            final_subset.append(subset["indices"])
 
         model = args.model
         channel, im_size, num_classes, class_names, mean, std, dst_train, dst_test = datasets.__dict__[args.dataset](
@@ -382,6 +267,8 @@ def continual_learning(wb=None):
             win='result', append=True)
 
         # 回忆
+
+
         start_epoch = 0
         merge_dataset = None
         for d_step in range(args.divide_step):
@@ -467,6 +354,7 @@ def continual_learning(wb=None):
         checkpoint = {}
         # visdom
         epoch_list = [i for i in range(start_epoch, args.recall_epochs)]
+        solution = 0
         vis.line(Y=rec.train_loss, X=epoch_list, win='train_loss_{}_{}'.format(exp, solution),
                  opts=dict(title='train_loss_{}_{}'.format(exp, solution), showlegend=True))
         vis.line(Y=rec.train_acc, X=epoch_list, win='train_acc_{}_{}'.format(exp, solution),

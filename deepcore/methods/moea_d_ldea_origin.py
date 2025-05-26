@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import pickle
 from torch.utils.data import TensorDataset
 
+from .micro_search_algorithm import Individual
 from .earlytrain import EarlyTrain
 from .methods_utils import *
 from ..nets.nets_utils import MyDataParallel
@@ -58,203 +59,204 @@ def plot_nested_list(nested_list, diff=None, important_points=None, title='X-Y',
     file_path = os.path.join(folder_name, '{}.png'.format(title))
     plt.savefig(file_path)
     plt.show()
+    plt.close()
 
 
-class Individual:
-    fitness_calculators = None
-    device = 'cuda'
-    last_init_individual = None
-
-    def __init__(self, total_gene_num, gene_num, target_num, step_rate=0.01):
-        self.total_gene_num = total_gene_num
-        self.gene_num = gene_num
-        self.gene = set()
-        self.unselected_gene = set(torch.arange(total_gene_num).numpy())
-        self.target_num = target_num
-        self.step_rate = step_rate
-        self.fitness = [None for i in range(len(Individual.fitness_calculators))]
-        self.origin_fitness = [None for i in range(len(Individual.fitness_calculators))]
-
-    def clone(self):
-        copy_ind = copy.deepcopy(self)
-        return copy_ind
-
-    def crossover(self, other):
-        if self.gene == other.gene:
-            return self.mutation(), other.mutation()
-        child_1 = self.clone()
-        gene_1 = random.choice(list(self.gene - other.gene))
-        child_2 = other.clone()
-        gene_2 = random.choice(list(other.gene - self.gene))
-        child_1.gene.remove(gene_1)
-        child_1.gene.add(gene_2)
-        child_1.unselected_gene.remove(gene_2)
-        child_1.unselected_gene.add(gene_1)
-        child_1.set_fitness()
-        child_2.gene.remove(gene_2)
-        child_2.gene.add(gene_1)
-        child_2.unselected_gene.remove(gene_1)
-        child_2.unselected_gene.add(gene_2)
-        child_2.set_fitness()
-        return child_1, child_2
-
-    def mutation(self):
-
-        child = self.clone()
-        new_gene = random.choice(list(self.unselected_gene))
-        remove_gene = random.choice(list(self.gene))
-        child.gene.remove(remove_gene)
-        child.gene.add(new_gene)
-        child.unselected_gene.remove(new_gene)
-        child.unselected_gene.add(remove_gene)
-        child.set_fitness()
-        return child
-
-    def random_init(self):
-        self.gene = set(random.sample(self.unselected_gene, self.gene_num))
-        self.unselected_gene = self.unselected_gene - self.gene
-        self.set_fitness()
-
-    def local_search(self, weight_vector):
-        print(self.fitness, " local search: ", weight_vector)
-        self.step_rate = self.step_rate * 0.9
-        search_num = max(1, round(self.step_rate * self.gene_num))
-        child = self.clone()
-        child.__remove_worst(weight_vector, search_num)
-        child.__greedy_search(weight_vector, search_num)
-        child.set_fitness()
-        if child < self:
-            print("search better")
-        elif child > self:
-            print("search worse")
-        else:
-            print("search equal")
-        return child
-
-    def local_search_random(self, weight_vector):
-        print(self.fitness, " local search: ")
-        child = self.clone()
-        num = math.ceil(self.gene_num * 0.01)
-        remove_gene = set(random.sample(list(self.gene), num))
-        child.gene = child.gene - remove_gene
-        child.unselected_gene.update(remove_gene)
-        child.__greedy_search(weight_vector, num)
-        child.set_fitness()
-        if child < self:
-            print("search better")
-        elif child > self:
-            print("search worse")
-        else:
-            print("search equal")
-        return child
-
-    def __remove_worst(self, weight_vector, num=1):
-        score_array = torch.stack([c.selected_fitness(self).float() for c in self.fitness_calculators], dim=0).to(
-            self.device)
-        res = torch.matmul(score_array.T, weight_vector.unsqueeze(1))
-        res = res.squeeze(1)
-        _, indices = torch.topk(res, k=num)
-        l = list(self.gene)
-        selected = set([l[i] for i in indices])
-        self.gene.difference_update(selected)
-        self.unselected_gene.update(selected)
-
-    def __remove_worst_single(self, weight_vector):
-        score_array = torch.stack([c.selected_fitness(self).float() for c in self.fitness_calculators], dim=0).to(
-            self.device)
-        res = torch.matmul(score_array.T, weight_vector.unsqueeze(1))
-        res = res.squeeze(1)
-        selected = list(self.gene)[torch.argmax(res)]
-        self.gene.discard(selected)
-        self.unselected_gene.add(selected)
-
-    def __greedy_search(self, weight_vector, num):
-
-        if len(self.gene) <= 5:
-            selected = set(random.sample(list(self.unselected_gene), num))
-            self.gene.update(selected)
-            self.unselected_gene.difference_update(selected)
-            return
-        score_array = torch.stack([c.unselected_fitness(self).float() for c in self.fitness_calculators], dim=0).to(
-            self.device)
-        res = torch.matmul(score_array.T, weight_vector.unsqueeze(1))
-        res = res.squeeze(1)
-        _, indices = torch.topk(res, k=num, largest=False)
-        l = list(self.unselected_gene)
-        selected = set([l[i] for i in indices])
-        self.gene.update(selected)
-        self.unselected_gene.difference_update(selected)
-
-    def __greedy_search_old(self, weight_vector, num):
-
-        if len(self.gene) == 0:
-            selected = random.choice(list(self.unselected_gene))
-            self.gene.add(selected)
-            self.unselected_gene.remove(selected)
-            num -= 1
-        for i in range(num):
-            score_array = torch.stack([c.unselected_fitness(self).float() for c in self.fitness_calculators], dim=0).to(
-                self.device)
-            res = torch.matmul(score_array.T, weight_vector.unsqueeze(1))
-            res = res.squeeze(1)
-            selected = list(self.unselected_gene)[torch.argmin(res)]
-            self.gene.add(selected)
-            self.unselected_gene.remove(selected)
-
-    def greedy_init(self, weight_vector, fraction=None):
-        init_num = self.gene_num
-        if fraction is not None:
-            sample_num = round(fraction * self.gene_num)
-            self.gene = set(random.sample(list(Individual.last_init_individual), sample_num))
-            self.unselected_gene = self.unselected_gene - self.gene
-            init_num = self.gene_num - sample_num
-        current_rate = 1.0
-        while init_num > 0:
-            step = min(init_num, round(self.total_gene_num * 0.001))
-            step = max(1, step)
-            self.__greedy_search(weight_vector, step)
-            init_num -= step
-            current_rate = current_rate * 0.9
-
-        Individual.last_init_individual = self.gene
-        print('init finish: ', fraction)
-        self.set_fitness()
-
-    def init(self, selected):
-        self.gene = set(selected)
-        self.unselected_gene = self.unselected_gene - self.gene
-        self.set_fitness()
-
-    def __eq__(self, other):
-        if self > other or self < other:
-            return False
-        else:
-            return True
-
-    def __lt__(self, other):
-        for i in range(self.target_num):
-            if self.fitness[i] >= other.fitness[i]:
-                return False
-        return True
-
-    def __gt__(self, other):
-        for i in range(self.target_num):
-            if self.fitness[i] <= other.fitness[i]:
-                return False
-        return True
-
-    def get_single_fitness(self, weight_vector):
-
-        dot_product = torch.dot(weight_vector.cpu(), torch.tensor(self.fitness))
-
-        return dot_product.item()
-
-    def set_fitness(self):
-        # self.fitness = [round(calculator.fitness(self), 6) for calculator in self.fitness_calculators]
-        for i in range(len(self.fitness_calculators)):
-            f, origin_f = self.fitness_calculators[i].fitness(self)
-            self.fitness[i] = round(f, 6)
-            self.origin_fitness[i] = round(origin_f, 6)
+# class Individual:
+#     fitness_calculators = None
+#     device = 'cuda'
+#     last_init_individual = None
+#
+#     def __init__(self, total_gene_num, gene_num, target_num, step_rate=0.01):
+#         self.total_gene_num = total_gene_num
+#         self.gene_num = gene_num
+#         self.gene = set()
+#         self.unselected_gene = set(torch.arange(total_gene_num).numpy())
+#         self.target_num = target_num
+#         self.step_rate = step_rate
+#         self.fitness = [None for i in range(len(Individual.fitness_calculators))]
+#         self.origin_fitness = [None for i in range(len(Individual.fitness_calculators))]
+#
+#     def clone(self):
+#         copy_ind = copy.deepcopy(self)
+#         return copy_ind
+#
+#     def crossover(self, other):
+#         if self.gene == other.gene:
+#             return self.mutation(), other.mutation()
+#         child_1 = self.clone()
+#         gene_1 = random.choice(list(self.gene - other.gene))
+#         child_2 = other.clone()
+#         gene_2 = random.choice(list(other.gene - self.gene))
+#         child_1.gene.remove(gene_1)
+#         child_1.gene.add(gene_2)
+#         child_1.unselected_gene.remove(gene_2)
+#         child_1.unselected_gene.add(gene_1)
+#         child_1.set_fitness()
+#         child_2.gene.remove(gene_2)
+#         child_2.gene.add(gene_1)
+#         child_2.unselected_gene.remove(gene_1)
+#         child_2.unselected_gene.add(gene_2)
+#         child_2.set_fitness()
+#         return child_1, child_2
+#
+#     def mutation(self):
+#
+#         child = self.clone()
+#         new_gene = random.choice(list(self.unselected_gene))
+#         remove_gene = random.choice(list(self.gene))
+#         child.gene.remove(remove_gene)
+#         child.gene.add(new_gene)
+#         child.unselected_gene.remove(new_gene)
+#         child.unselected_gene.add(remove_gene)
+#         child.set_fitness()
+#         return child
+#
+#     def random_init(self):
+#         self.gene = set(random.sample(self.unselected_gene, self.gene_num))
+#         self.unselected_gene = self.unselected_gene - self.gene
+#         self.set_fitness()
+#
+#     def local_search(self, weight_vector):
+#         print(self.fitness, " local search: ", weight_vector)
+#         self.step_rate = self.step_rate * 0.9
+#         search_num = max(1, round(self.step_rate * self.gene_num))
+#         child = self.clone()
+#         child.__remove_worst(weight_vector, search_num)
+#         child.__greedy_search(weight_vector, search_num)
+#         child.set_fitness()
+#         if child < self:
+#             print("search better")
+#         elif child > self:
+#             print("search worse")
+#         else:
+#             print("search equal")
+#         return child
+#
+#     def local_search_random(self, weight_vector):
+#         print(self.fitness, " local search: ")
+#         child = self.clone()
+#         num = math.ceil(self.gene_num * 0.01)
+#         remove_gene = set(random.sample(list(self.gene), num))
+#         child.gene = child.gene - remove_gene
+#         child.unselected_gene.update(remove_gene)
+#         child.__greedy_search(weight_vector, num)
+#         child.set_fitness()
+#         if child < self:
+#             print("search better")
+#         elif child > self:
+#             print("search worse")
+#         else:
+#             print("search equal")
+#         return child
+#
+#     def __remove_worst(self, weight_vector, num=1):
+#         score_array = torch.stack([c.selected_fitness(self).float() for c in self.fitness_calculators], dim=0).to(
+#             self.device)
+#         res = torch.matmul(score_array.T, weight_vector.unsqueeze(1))
+#         res = res.squeeze(1)
+#         _, indices = torch.topk(res, k=num)
+#         l = list(self.gene)
+#         selected = set([l[i] for i in indices])
+#         self.gene.difference_update(selected)
+#         self.unselected_gene.update(selected)
+#
+#     def __remove_worst_single(self, weight_vector):
+#         score_array = torch.stack([c.selected_fitness(self).float() for c in self.fitness_calculators], dim=0).to(
+#             self.device)
+#         res = torch.matmul(score_array.T, weight_vector.unsqueeze(1))
+#         res = res.squeeze(1)
+#         selected = list(self.gene)[torch.argmax(res)]
+#         self.gene.discard(selected)
+#         self.unselected_gene.add(selected)
+#
+#     def __greedy_search(self, weight_vector, num):
+#
+#         if len(self.gene) <= 5:
+#             selected = set(random.sample(list(self.unselected_gene), num))
+#             self.gene.update(selected)
+#             self.unselected_gene.difference_update(selected)
+#             return
+#         score_array = torch.stack([c.unselected_fitness(self).float() for c in self.fitness_calculators], dim=0).to(
+#             self.device)
+#         res = torch.matmul(score_array.T, weight_vector.unsqueeze(1))
+#         res = res.squeeze(1)
+#         _, indices = torch.topk(res, k=num, largest=False)
+#         l = list(self.unselected_gene)
+#         selected = set([l[i] for i in indices])
+#         self.gene.update(selected)
+#         self.unselected_gene.difference_update(selected)
+#
+#     def __greedy_search_old(self, weight_vector, num):
+#
+#         if len(self.gene) == 0:
+#             selected = random.choice(list(self.unselected_gene))
+#             self.gene.add(selected)
+#             self.unselected_gene.remove(selected)
+#             num -= 1
+#         for i in range(num):
+#             score_array = torch.stack([c.unselected_fitness(self).float() for c in self.fitness_calculators], dim=0).to(
+#                 self.device)
+#             res = torch.matmul(score_array.T, weight_vector.unsqueeze(1))
+#             res = res.squeeze(1)
+#             selected = list(self.unselected_gene)[torch.argmin(res)]
+#             self.gene.add(selected)
+#             self.unselected_gene.remove(selected)
+#
+#     def greedy_init(self, weight_vector, fraction=None):
+#         init_num = self.gene_num
+#         if fraction is not None:
+#             sample_num = round(fraction * self.gene_num)
+#             self.gene = set(random.sample(list(Individual.last_init_individual), sample_num))
+#             self.unselected_gene = self.unselected_gene - self.gene
+#             init_num = self.gene_num - sample_num
+#         current_rate = 1.0
+#         while init_num > 0:
+#             step = min(init_num, round(self.total_gene_num * 0.001))
+#             step = max(1, step)
+#             self.__greedy_search(weight_vector, step)
+#             init_num -= step
+#             current_rate = current_rate * 0.9
+#
+#         Individual.last_init_individual = self.gene
+#         print('init finish: ', fraction)
+#         self.set_fitness()
+#
+#     def init(self, selected):
+#         self.gene = set(selected)
+#         self.unselected_gene = self.unselected_gene - self.gene
+#         self.set_fitness()
+#
+#     def __eq__(self, other):
+#         if self > other or self < other:
+#             return False
+#         else:
+#             return True
+#
+#     def __lt__(self, other):
+#         for i in range(self.target_num):
+#             if self.fitness[i] >= other.fitness[i]:
+#                 return False
+#         return True
+#
+#     def __gt__(self, other):
+#         for i in range(self.target_num):
+#             if self.fitness[i] <= other.fitness[i]:
+#                 return False
+#         return True
+#
+#     def get_single_fitness(self, weight_vector):
+#
+#         dot_product = torch.dot(weight_vector.cpu(), torch.tensor(self.fitness))
+#
+#         return dot_product.item()
+#
+#     def set_fitness(self):
+#         # self.fitness = [round(calculator.fitness(self), 6) for calculator in self.fitness_calculators]
+#         for i in range(len(self.fitness_calculators)):
+#             f, origin_f = self.fitness_calculators[i].fitness(self)
+#             self.fitness[i] = round(f, 6)
+#             self.origin_fitness[i] = round(origin_f, 6)
 
 class SubProblems:
     def __init__(self, target_num, count, device):
@@ -367,7 +369,7 @@ class MOEADAlgorithm:
         self.greedy_best_fitness_points = None
         self.output_folder = output_folder
 
-    def get_best_in_solution(self, fraction=None):
+    def get_best_in_solution(self, fraction=None, selected=None):
         # 比例优化空间
         if fraction is None:
             step = 1.0 / (self.solution_num - 1)
@@ -385,7 +387,18 @@ class MOEADAlgorithm:
 
         fraction_matrix = fraction.unsqueeze(0).repeat(scores.size(0), 1)
         scores = torch.sum(scores * fraction_matrix, dim=1)
-        best = torch.argmin(scores)
+        if selected is None:
+            best = torch.argmin(scores)
+        else:
+            selected = set([i.item() for i in selected])
+            index = 0
+            sorted_list = torch.argsort(scores)
+            while index < len(scores) and sorted_list[index].item() in selected:
+                index += 1
+            if index < len(scores):
+                best = sorted_list[index]
+            else:
+                best = torch.argmin(scores)
         return best
 
     def get_multi_best_solution(self):
@@ -393,7 +406,7 @@ class MOEADAlgorithm:
         step = 1.0 / (self.solution_num - 1)
         for i in range(self.solution_num):
             fraction = [max(i * step, 0.00001), max(1.0 - i * step, 0.00001)]
-            best_list.append(self.get_best_in_solution(fraction=fraction))
+            best_list.append(self.get_best_in_solution(fraction, best_list))
         return best_list
 
     def update_best_solution(self):
@@ -418,6 +431,26 @@ class MOEADAlgorithm:
         beta = min(self.target_num / 5, 0.4)
         for i in range(iter):
             print("Iter:", i)
+            if i % 5 == 0:
+                fitness_front = [p.fitness for p in self.best_solution]
+                subproblems_front = [p.fitness for p in self.best_population_for_subproblems]
+                self.update_best_solution()
+                best = self.get_best_in_solution()
+                self.last_best_index = best
+                best_list = self.get_multi_best_solution()
+                best_results = [list(self.best_solution[b].gene) for b in best_list]
+                path = os.path.join(process_data_folder, 'iter_{}_label_{}'.format(i, label))
+                os.makedirs(path, exist_ok=True)
+                with open(os.path.join(path, 'best_results.pkl'), 'wb') as f:
+                    pickle.dump(best_results, f)
+                with open(os.path.join(path, 'best_solution.pkl'), 'wb') as f:
+                    pickle.dump(self.best_solution, f)
+                plot_nested_list(subproblems_front, diff=self.greedy_best_fitness_points,
+                                 title="Iter_subproblems_{}".format(i),
+                                 important_points=[self.best_solution[best].fitness], folder_name=self.output_folder)
+                plot_nested_list(fitness_front, diff=self.greedy_best_fitness_points, title="Iter_pareto_{}".format(i),
+                                 important_points=[self.best_solution[best].fitness], folder_name=self.output_folder)
+
             utility[:, i % L] = 1
             for opr in range(self.population_num):
 
@@ -472,6 +505,9 @@ class MOEADAlgorithm:
                     nondeminated = True
                     replaced = False
                     for k in range(len(self.best_solution)):
+                        if current.all_equal(self.best_solution[k]):
+                            nondeminated = False
+                            break
                         if current > self.best_solution[k]:
                             nondeminated = False
                             break
@@ -490,27 +526,8 @@ class MOEADAlgorithm:
                         utility[selected_subproblem][i % L] = utility[selected_subproblem][i % L] + 1
             # if i % 5 == 4:
             #     self.update_best_solution()
-            fitness_front = [p.fitness for p in self.best_solution]
-            subproblems_front = [p.fitness for p in self.best_population_for_subproblems]
-            best = self.get_best_in_solution()
-            self.last_best_index = best
-            if i % 5 == 0:
-                self.update_best_solution()
-                best = self.get_best_in_solution()
-                self.last_best_index = best
-                best_list = self.get_multi_best_solution()
-                best_results = [list(self.best_solution[b].gene) for b in best_list]
-                path = os.path.join(process_data_folder, 'iter_{}_label_{}'.format(i, label))
-                os.makedirs(path, exist_ok=True)
-                with open(os.path.join(path, 'best_results.pkl'), 'wb') as f:
-                    pickle.dump(best_results, f)
-                with open(os.path.join(path, 'best_solution.pkl'), 'wb') as f:
-                    pickle.dump(self.best_solution, f)
-                plot_nested_list(subproblems_front, diff=self.greedy_best_fitness_points,
-                                 title="Iter_subproblems_{}".format(i),
-                                 important_points=[self.best_solution[best].fitness], folder_name=self.output_folder)
-                plot_nested_list(fitness_front, diff=self.greedy_best_fitness_points, title="Iter_pareto_{}".format(i),
-                                 important_points=[self.best_solution[best].fitness], folder_name=self.output_folder)
+
+
 
         self.update_best_solution()
         # 对帕累托前沿的点进行评分并选择最优解
@@ -603,7 +620,7 @@ class MOEAD(EarlyTrain):
             selection_results = [np.array([], dtype=np.int64) for i in range(self.args.solution_num)]
             scores = []
             for c in range(self.args.num_classes):
-                test_data_folder = 'process_data/{}_{}/'.format(self.args.dataset, self.fraction)
+                test_data_folder = 'process_data/{}_{}_{}/'.format(self.args.dataset, self.fraction, c)
                 os.makedirs(test_data_folder, exist_ok=True)
                 class_index = np.arange(self.n_train)[self.dst_train.targets == c]
                 features_matrix, confidence = self.construct_matrix(class_index)
@@ -646,7 +663,7 @@ class MOEAD(EarlyTrain):
             selection_results = None
             # scores = self.rank_uncertainty()
             # selection_result = np.argsort(scores)[:self.coreset_size]
-        test_data_folder = 'test_data/iter_{}/ldea_{}'.format(self.args.iter, self.args.dataset)
+        test_data_folder = 'process_data/{}_{}/'.format(self.args.dataset, self.fraction)
         os.makedirs(test_data_folder, exist_ok=True)
         best_file_path = os.path.join(test_data_folder, 'best_multi_{}.npy'.format(self.fraction))
         np.save(best_file_path, selection_results)
