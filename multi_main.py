@@ -373,6 +373,7 @@ def multi_main(wb=None):
             wb.append('总时间', exp, exp_end_time - exp_start_time)
             wb.append('准确度', exp, global_best_prec1)
             wb.append('算法时间', exp, algorithm_end_time - algorithm_start_time)
+    return global_best_prec1
 
 
 
